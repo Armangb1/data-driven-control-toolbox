@@ -14,6 +14,7 @@ All notable changes to this project are documented in this file.
 - `ddc.ufc`: Unfalsified adaptive switching control, single- and multimodel candidate-bank variants.
 - `ddc.spsa`: Simultaneous Perturbation Stochastic Approximation online optimizer.
 - `ddc.vrft`: Virtual Reference Feedback Tuning (offline, MATLAB-only).
-- Six per-algorithm Simulink libraries (`ddc_common_lib`, `ddc_deepc_lib`, `ddc_mfac_lib`,
-  `ddc_ufc_lib`, `ddc_spsa_lib`, `ddc_str_lib`), grouped under one "Data-Driven Control
-  Toolbox" node in the Simulink Library Browser via `toolbox/lib/slblocks.m`.
+- Single consolidated Simulink library (`ddc_lib.slx`) with all blocks organized into category
+  subsystem folders (Common Utilities, DeePC, MFAC, Unfalsified Switching, SPSA, STR Baselines),
+  registered as one "Data-Driven Control Toolbox" node in the Library Browser via
+  `toolbox/lib/slblocks.m`.
