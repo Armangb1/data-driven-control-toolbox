@@ -1,0 +1,25 @@
+# Simulink / MATLAB build & cache artifacts
+slprj/
+sccprj/
+*.slxc
+*.autosave
+*.asv
+*.mex*
+codegen/
+*.slreportgen
+
+# Toolbox Packager build output
+*.mltbx
+release/
+
+# Published documentation output
+doc/html/
+
+# Test results
+tests/results/
+*.mldatx.bak
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.swp
