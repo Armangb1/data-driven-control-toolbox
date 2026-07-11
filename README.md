@@ -18,9 +18,8 @@ plain MATLAB object (for offline simulation, unit testing, or scripting).
 ```
 toolbox/            Packaging root (this folder is what ships as the .mltbx)
   +ddc/              MATLAB package namespace (ddc.deepc.DeePCController, etc.)
-  lib/               Simulink library sources (.slx)
+  lib/               Simulink library sources (.slx) + slblocks.m (Library Browser registration)
   examples/          Shipped examples, browsable from the Add-On Explorer
-  slblocks.m         Registers the library in the Simulink Library Browser
 
 doc/                 Narrative / theory documentation (not shipped)
 tests/               matlab.unittest test classes + local test runner (not shipped)
@@ -53,7 +52,7 @@ run('tools/buildToolbox.m')   % produces a .mltbx via the Toolbox Packager API
 ## Using the Simulink Library
 
 Open the Simulink Library Browser and look for **Data-Driven Control Toolbox** (registered
-by `toolbox/slblocks.m`), which groups the six category libraries as children:
+by `toolbox/lib/slblocks.m`), which groups the six category libraries as children:
 `ddc_common_lib`, `ddc_deepc_lib`, `ddc_mfac_lib`, `ddc_ufc_lib`, `ddc_spsa_lib`,
 `ddc_str_lib`. Or open one directly, e.g.:
 

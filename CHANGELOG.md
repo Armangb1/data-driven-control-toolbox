@@ -16,4 +16,4 @@ All notable changes to this project are documented in this file.
 - `ddc.vrft`: Virtual Reference Feedback Tuning (offline, MATLAB-only).
 - Six per-algorithm Simulink libraries (`ddc_common_lib`, `ddc_deepc_lib`, `ddc_mfac_lib`,
   `ddc_ufc_lib`, `ddc_spsa_lib`, `ddc_str_lib`), grouped under one "Data-Driven Control
-  Toolbox" node in the Simulink Library Browser via `toolbox/slblocks.m`.
+  Toolbox" node in the Simulink Library Browser via `toolbox/lib/slblocks.m`.
