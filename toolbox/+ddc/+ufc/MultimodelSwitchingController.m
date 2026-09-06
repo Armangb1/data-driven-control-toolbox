@@ -1,136 +1,308 @@
 classdef MultimodelSwitchingController < matlab.System
-    %MULTIMODELSWITCHINGCONTROLLER Multimodel unfalsified adaptive switching control.
-    %   Self-contained extension of ddc.ufc.UnfalsifiedSwitchingController
-    %   to a bank of dynamic PI candidate controllers (rather than static
-    %   proportional gains). Because PI candidates have internal state,
-    %   this block internally maintains both the candidate control-signal
-    %   generation and the switching/cost logic (i.e. it is the "masked
-    %   subsystem" equivalent of a candidate bank + switching-logic pair,
-    %   collapsed into a single MATLAB System block).
+    %MULTIMODELSWITCHINGCONTROLLER Multimodel unfalsified adaptive
+    %supervisory switching control (MMUASSC).
     %
-    %   Each candidate is a discrete-time velocity-form PI controller:
-    %       u_i(k) = u_i(k-1) + Kp_i*(e(k)-e(k-1)) + Ki_i*Ts*e(k),  e = r-y
+    %   Extension of ddc.ufc.UnfalsifiedSwitchingController to a bank of
+    %   candidate PAIRS (C_i, M_i), where C_i is a candidate controller
+    %   and M_i is a candidate reference MODEL of the plant. Each pair is
+    %   scored by comparing the REAL signals against what the pair
+    %   predicts, and the lowest-cost pair is switched into the real loop.
     %
-    %   The fictitious tracking error for candidate i is reconstructed
-    %   recursively from the actually-applied control increment
-    %   du(k) = uActual(k-1) - uActual(k-2):
+    %   Three loops are involved at each step k:
     %
-    %       ehat_i(k) = (du(k) + Kp_i*ehat_i(k-1)) / (Kp_i + Ki_i*Ts)
+    %   (a) REAL loop: each candidate controller C_i is applied to the real
+    %       tracking error e_real(k) = r(k) - y(k) (as in the candidate
+    %       bank); the candidate selected at the previous step (one-sample
+    %       delay, as with a ZOH actuator) drives the actual plant,
+    %       producing the real applied signal pair z(k) = [y(k); u(k)].
     %
-    %   and accumulated into an exponentially-forgotten cost
-    %   V_i(k) = lambda*V_i(k-1) + (1-lambda)*ehat_i(k)^2. The controller
-    %   switches to the lowest-cost candidate subject to a hysteresis
-    %   margin and minimum dwell time.
+    %   (b) POTENTIAL loop: for each candidate i the fictitious reference
+    %       rtilde_i(k) = ehat_i(k) + y(k) is reconstructed by solving
+    %       C_i's difference equation backwards from the APPLIED control
+    %       u(k) that this step produced:
+    %
+    %           u(k) = b0*e(k) + b1*e(k-1) + ... - a1*u(k-1) - ...
+    %           ehat_i(k) = (1/b0)*[u(k)
+    %                         - sum bj*ehat_i(k-j) + sum aj*u(k-j)]
+    %
+    %       with e = rtilde - y, i.e. rtilde_i(k) = ehat_i(k) + y(k).
+    %
+%   (c) CANDIDATE loop: rtilde_i(k) is fed into the closed loop of C_i
+%       and the MODEL M_i (not the real plant):
+%
+%           e_i(k) = rtilde_i(k) - y_i(k)
+%           u_i(k) = C_i( e_i(k) )
+%           y_i(k) = M_i( u_i(k) )
+%
+%       Since C_i and M_i have direct feedthrough, this set of equations
+%       is circular and is resolved algebraically per sample using the
+%       past-state (difference-equation) contributions of C_i and M_i:
+%
+%           ucPast_i = recur. terms of C_i from past e_i, u_i
+%           ymPast_i = recur. terms of M_i from past u_i, y_i
+%           y_i(k) = (bM1*bC1*rtilde_i(k) + bM1*ucPast_i + ymPast_i)/(1 + bM1*bC1)
+%           u_i(k) = bC1*(rtilde_i(k) - y_i(k)) + ucPast_i
+%
+%       giving the predicted signal z_i(k) = [y_i(k); u_i(k)] from a
+%       genuine forward simulation with its own internal state per
+%       candidate (both C_i's and M_i's difference-equation states).
+%       When C_i/M_i exactly describe the real loop, z_i(k) reproduces
+%       z(k) = [y(k); u(k)] and the cost V_i stays at zero.
+    %
+    %   COST (corrected): the pair cost is the normalized prediction
+    %   error accumulated with exponential forgetting and a running max,
+    %
+    %           N_i(k) = lam*N_i(k-1) + || z(k) - z_i(k) ||^2
+    %           D_i(k) = lam*D_i(k-1) + || z_i(k) ||^2
+    %           V_i(k) = max( V_i(k-1), N_i(k) / (D_i(k) + eps) )
+    %
+    %   i.e. V(C_i, z, t) = sup_tau || z(tau) - z_i(tau) || / ( || z_i(tau) || + eps ).
+    %   The controller switches to the lowest-cost candidate subject to a
+    %   hysteresis margin (the switch takes effect on the next sample).
+    %   When C_i/M_i match the true plant, z_i reproduces z and V_i
+    %   settles near zero.
+    %
+    %   The Controllers and Models parameters each accept a tf array or a
+    %   plain numeric vector of gains (wrapped internally as discrete-time
+    %   proportional terms). Continuous-time models are auto-discretized
+    %   using c2d with the SampleTime and DiscretizationMethod properties.
     %
     %   Usable as a plain MATLAB object or as a Simulink "MATLAB System"
     %   block.
     %
-    %   See also ddc.ufc.UnfalsifiedSwitchingController.
+    %   See also ddc.ufc.UnfalsifiedSwitchingController, ddc.ufc.CandidateControllerBank.
 
     properties (Nontunable)
-        KpGains (:,1) double {mustBeReal} = [0.5; 1; 2]     % candidate proportional gains
-        KiGains (:,1) double {mustBeReal} = [0.1; 0.2; 0.5] % candidate integral gains
-        SampleTime (1,1) double {mustBePositive} = 0.01
+        Controllers = [0.5; 1; 2]  % tf array or numeric gain vector, one per candidate
+        Models      = [0.5; 1; 2]  % tf array or numeric gain vector, one per candidate
+        SampleTime     (1,1) double {mustBePositive} = 1
+        DiscretizationMethod (1,1) string {mustBeMember(DiscretizationMethod, ...
+            ["zoh","foh","tustin","matched","impulse"])} = "zoh"
     end
 
     properties
         ForgettingFactor (1,1) double {mustBeGreaterThan(ForgettingFactor,0), ...
                                         mustBeLessThanOrEqual(ForgettingFactor,1)} = 0.95
         HysteresisMargin (1,1) double {mustBeNonnegative} = 1e-3
-        MinDwellSteps    (1,1) double {mustBeNonnegative, mustBeInteger} = 5
-        ResetCostOnSwitch (1,1) logical = true  % reset V on switch so new candidate starts fresh
+        Epsilon          (1,1) double {mustBePositive} = 1e-12
     end
 
     properties (Access = private)
         V_
-        EHatPrev_
-        UCandPrev_
-        EPrev_
-        UPrev_
-        UPrevPrev_
+        N_
+        D_
         ActiveIndex_
-        DwellCounter_
+        BCoeffs_     % controller numerator coefficients, one cell per candidate
+        ACoeffs_     % controller denominator coefficients, one cell per candidate
+        BMCoeffs_    % model numerator coefficients, one cell per candidate
+        AMCoeffs_    % model denominator coefficients, one cell per candidate
+        EhatPast_    % fictitious error history, size (n, MaxM_) -- loop (b)
+        UActualPast_ % applied-control history, size (MaxN_, 1) -- loop (a)
+        UActualPrev_ % last applied control u(k-1)
+        ERealPast_   % real tracking-error history, size (n, MaxM_) -- loop (a)
+        URealPast_   % real control-per-candidate history, size (n, MaxN_) -- loop (a)
+        EiPast_      % candidate-loop tracking-error history, size (n, MaxM_) -- loop (c)
+        UiPast_      % candidate-loop control history, size (n, max(MaxN_,MaxMM_)) -- loop (c)
+        YiPast_      % candidate-loop output history, size (n, MaxNM_) -- loop (c)
+        MaxM_        % max controller numerator order
+        MaxN_        % max controller denominator order
+        MaxMM_       % max model numerator order
+        MaxNM_       % max model denominator order
+        Ts_
     end
 
     methods
         function obj = MultimodelSwitchingController(varargin)
             setProperties(obj, nargin, varargin{:});
-            if numel(obj.KpGains) ~= numel(obj.KiGains)
-                error('ddc:ufc:MultimodelSwitchingController:GainSizeMismatch', ...
-                    'KpGains and KiGains must have the same number of candidates.');
+            obj.resolveControllers();
+            obj.resolveModels();
+            if numel(obj.Controllers) ~= numel(obj.Models)
+                error('ddc:ufc:MultimodelSwitchingController:PairSizeMismatch', ...
+                    'Controllers and Models must contain the same number of candidates.');
             end
         end
     end
 
     methods (Access = protected)
         function setupImpl(obj)
-            n = numel(obj.KpGains);
+            obj.resolveControllers();
+            obj.resolveModels();
+            if numel(obj.Controllers) ~= numel(obj.Models)
+                error('ddc:ufc:MultimodelSwitchingController:PairSizeMismatch', ...
+                    'Controllers and Models must contain the same number of candidates.');
+            end
+            obj.Ts_ = obj.SampleTime;
+            n = numel(obj.Controllers);
+
             obj.V_ = zeros(n, 1);
-            obj.EHatPrev_ = zeros(n, 1);
-            obj.UCandPrev_ = zeros(n, 1);
-            obj.EPrev_ = 0;
-            obj.UPrev_ = 0;
-            obj.UPrevPrev_ = 0;
+            obj.N_ = zeros(n, 1);
+            obj.D_ = zeros(n, 1);
             obj.ActiveIndex_ = 1;
-            obj.DwellCounter_ = 0;
+
+            obj.BCoeffs_ = cell(n, 1);
+            obj.ACoeffs_ = cell(n, 1);
+            obj.MaxM_ = 0;
+            obj.MaxN_ = 0;
+            for i = 1:n
+                C = obj.Controllers(i);
+                if C.Ts == 0
+                    C = c2d(C, obj.Ts_, char(obj.DiscretizationMethod));
+                end
+                [b, a] = tfdata(C, 'v');
+                obj.BCoeffs_{i} = b(:)';
+                obj.ACoeffs_{i} = a(:)';
+                obj.MaxM_ = max(obj.MaxM_, numel(b) - 1);
+                obj.MaxN_ = max(obj.MaxN_, numel(a) - 1);
+            end
+
+            obj.BMCoeffs_ = cell(n, 1);
+            obj.AMCoeffs_ = cell(n, 1);
+            obj.MaxMM_ = 0;
+            obj.MaxNM_ = 0;
+            for i = 1:n
+                Md = obj.Models(i);
+                if Md.Ts == 0
+                    Md = c2d(Md, obj.Ts_, char(obj.DiscretizationMethod));
+                end
+                [b, a] = tfdata(Md, 'v');
+                obj.BMCoeffs_{i} = b(:)';
+                obj.AMCoeffs_{i} = a(:)';
+                obj.MaxMM_ = max(obj.MaxMM_, numel(b) - 1);
+                obj.MaxNM_ = max(obj.MaxNM_, numel(a) - 1);
+            end
+
+            mC = max(obj.MaxM_, 1);
+            nC = max(obj.MaxN_, 1);
+            nM = max(obj.MaxNM_, 1);
+            nU = max(max(obj.MaxN_, obj.MaxMM_), 1);
+
+            obj.EhatPast_ = zeros(n, mC);
+            obj.UActualPast_ = zeros(nC, 1);
+            obj.UActualPrev_ = 0;
+
+            obj.ERealPast_ = zeros(n, mC + (obj.MaxM_ > 0));
+            obj.URealPast_ = zeros(n, nC + (obj.MaxN_ > 0));
+
+            obj.EiPast_ = zeros(n, mC + (obj.MaxM_ > 0));
+            obj.UiPast_ = zeros(n, nU + (max(obj.MaxN_, obj.MaxMM_) > 0));
+            obj.YiPast_ = zeros(n, nM + (obj.MaxNM_ > 0));
         end
 
         function resetImpl(obj)
-            n = numel(obj.KpGains);
+            n = numel(obj.Controllers);
             obj.V_ = zeros(n, 1);
-            obj.EHatPrev_ = zeros(n, 1);
-            obj.UCandPrev_ = zeros(n, 1);
-            obj.EPrev_ = 0;
-            obj.UPrev_ = 0;
-            obj.UPrevPrev_ = 0;
+            obj.N_ = zeros(n, 1);
+            obj.D_ = zeros(n, 1);
             obj.ActiveIndex_ = 1;
-            obj.DwellCounter_ = 0;
+
+            mC = max(obj.MaxM_, 1);
+            nC = max(obj.MaxN_, 1);
+            nM = max(obj.MaxNM_, 1);
+            nU = max(max(obj.MaxN_, obj.MaxMM_), 1);
+
+            obj.EhatPast_ = zeros(n, mC);
+            obj.UActualPast_ = zeros(nC, 1);
+            obj.UActualPrev_ = 0;
+
+            obj.ERealPast_ = zeros(n, mC + (obj.MaxM_ > 0));
+            obj.URealPast_ = zeros(n, nC + (obj.MaxN_ > 0));
+
+            obj.EiPast_ = zeros(n, mC + (obj.MaxM_ > 0));
+            obj.UiPast_ = zeros(n, nU + (max(obj.MaxN_, obj.MaxMM_) > 0));
+            obj.YiPast_ = zeros(n, nM + (obj.MaxNM_ > 0));
         end
 
         function [uSelected, activeIndex, costs] = stepImpl(obj, r, y)
-            e = r - y;
-            Ts = obj.SampleTime;
+            n = numel(obj.Controllers);
+            lam = obj.ForgettingFactor;
 
-            % 1) Reconstruct fictitious error per candidate from actual
-            %    applied-control history, and update costs.
-            du = obj.UPrev_ - obj.UPrevPrev_;
-            denom = obj.KpGains + obj.KiGains*Ts;
-            ehat = obj.EHatPrev_; % default: hold for degenerate candidates
-            valid = abs(denom) > 1e-9;
-            ehat(valid) = (du + obj.KpGains(valid).*obj.EHatPrev_(valid)) ./ denom(valid);
-            obj.V_ = obj.ForgettingFactor*obj.V_ + (1-obj.ForgettingFactor)*ehat.^2;
+            % ---- Loop (a): candidate bank on the real tracking error ----
+            % Each C_i applied to e_real(k) = r(k) - y(k); the candidate
+            % selected at the previous step (one-sample delay, as with a
+            % ZOH actuator) actually drives the plant.
+            eReal = r - y;
+            uCandReal = zeros(n, 1);
+            for i = 1:n
+                uCandReal(i) = applyIIR(obj.BCoeffs_{i}, obj.ACoeffs_{i}, ...
+                    eReal, obj.ERealPast_(i, 1:obj.MaxM_), ...
+                    obj.URealPast_(i, 1:obj.MaxN_));
+            end
+            uSelected = uCandReal(obj.ActiveIndex_);
 
-            % 2) Candidate PI control outputs for this step.
-            uCand = obj.UCandPrev_ + obj.KpGains*(e - obj.EPrev_) + obj.KiGains*Ts*e;
+            % ---- Loop (b): fictitious references from the APPLIED control.
+            % The real signal pair this step is z(k) = [y(k); u(k)] with
+            % u(k) = uSelected; reconstruct rtilde_i(k) = ehat_i(k) + y(k)
+            % by solving C_i's difference equation backwards from u(k).
+            ehat = computeFictitiousRefs(obj, uSelected);
+            rtilde = ehat + y;
 
-            % 3) Switching decision with hysteresis + dwell time.
+            % ---- Loop (c): forward-simulate C_i/M_i closed loop ----
+            % The loop e_i = rtilde_i - y_i, u_i = C_i(e_i), y_i = M_i(u_i)
+            % is circular when C_i and M_i have direct feedthrough; it is
+            % resolved algebraically per sample using each transfer
+            % function's past (state) contribution:
+            %     ucPast_i = past-state terms of C_i
+            %     ymPast_i = past-state terms of M_i
+            %     y_i(k) = (bM1*bC1*rtilde_i(k) + bM1*ucPast_i + ymPast_i)/(1+bM1*bC1)
+            %     u_i(k) = bC1*(rtilde_i(k)-y_i(k)) + ucPast_i
+            uCand = zeros(n, 1);
+            yCand = zeros(n, 1);
+            eCand = zeros(n, 1);
+            for i = 1:n
+                bC1 = obj.BCoeffs_{i}(1);
+                bM1 = obj.BMCoeffs_{i}(1);
+                ucPast = pastContrib(obj.BCoeffs_{i}, obj.ACoeffs_{i}, ...
+                    obj.EiPast_(i, 1:obj.MaxM_), obj.UiPast_(i, 1:obj.MaxN_));
+                ymPast = pastContrib(obj.BMCoeffs_{i}, obj.AMCoeffs_{i}, ...
+                    obj.UiPast_(i, 1:obj.MaxMM_), obj.YiPast_(i, 1:obj.MaxNM_));
+                yCand(i) = (bM1*bC1*rtilde(i) + bM1*ucPast + ymPast) / (1 + bM1*bC1);
+                eCand(i) = rtilde(i) - yCand(i);
+                uCand(i) = bC1*eCand(i) + ucPast;
+            end
+
+            % ---- Cost: compare real z(k) vs predicted z_i(k) ----
+            z = [y; uSelected];
+            for i = 1:n
+                zi = [yCand(i); uCand(i)];
+                d = z - zi;
+                obj.N_(i) = lam*obj.N_(i) + d'*d;
+                obj.D_(i) = lam*obj.D_(i) + zi'*zi;
+                obj.V_(i) = max(obj.V_(i), obj.N_(i) / (obj.D_(i) + obj.Epsilon));
+            end
+
+            % ---- Switching with hysteresis (selects for the next step) ----
             [minV, bestIdx] = min(obj.V_);
-            obj.DwellCounter_ = obj.DwellCounter_ + 1;
-            if bestIdx ~= obj.ActiveIndex_ && obj.DwellCounter_ >= obj.MinDwellSteps && ...
+            if bestIdx ~= obj.ActiveIndex_ && ...
                     minV < obj.V_(obj.ActiveIndex_) - obj.HysteresisMargin
                 obj.ActiveIndex_ = bestIdx;
-                obj.DwellCounter_ = 0;
-                if obj.ResetCostOnSwitch
-                    obj.V_ = zeros(size(obj.V_));
-                end
             end
 
             activeIndex = obj.ActiveIndex_;
-            uSelected = uCand(activeIndex);
             costs = obj.V_;
 
-            % 4) Update memories.
-            obj.UPrevPrev_ = obj.UPrev_;
-            obj.UPrev_ = uSelected;
-            obj.EPrev_ = e;
-            obj.UCandPrev_ = uCand;
-            obj.EHatPrev_ = ehat;
+            % ---- Update real-loop memories (loop a) ----
+            obj.EhatPast_ = shiftRows(obj.EhatPast_, ehat, obj.MaxM_);
+            obj.UActualPast_ = shiftVec(obj.UActualPast_, uSelected, obj.MaxN_);
+            obj.UActualPrev_ = uSelected;
+
+            for i = 1:n
+                obj.ERealPast_(i, :) = shiftAndInsert(obj.ERealPast_(i, :), eReal, obj.MaxM_);
+                obj.URealPast_(i, :) = shiftAndInsert(obj.URealPast_(i, :), uCandReal(i), obj.MaxN_);
+            end
+
+            % ---- Update candidate-loop memories (loop c) ----
+            for i = 1:n
+                obj.EiPast_(i, :) = shiftAndInsert(obj.EiPast_(i, :), eCand(i), obj.MaxM_);
+                obj.UiPast_(i, :) = shiftAndInsert(obj.UiPast_(i, :), uCand(i), ...
+                    max(obj.MaxN_, obj.MaxMM_));
+                obj.YiPast_(i, :) = shiftAndInsert(obj.YiPast_(i, :), yCand(i), obj.MaxNM_);
+            end
         end
 
         function [sz1, sz2, sz3] = getOutputSizeImpl(obj)
             sz1 = [1 1];
             sz2 = [1 1];
-            sz3 = [numel(obj.KpGains), 1];
+            sz3 = [obj.candidateCount(), 1];
         end
 
         function [dt1, dt2, dt3] = getOutputDataTypeImpl(~)
@@ -153,4 +325,101 @@ classdef MultimodelSwitchingController < matlab.System
             num = 3;
         end
     end
+
+    methods (Access = protected)
+        function sts = getSampleTimeImpl(obj)
+            sts = createSampleTime(obj, 'Type', 'Discrete', ...
+                'SampleTime', obj.SampleTime);
+        end
+    end
+
+    methods (Access = private)
+        function resolveControllers(obj)
+            if isempty(obj.Controllers)
+                obj.Controllers = [0.5; 1; 2];
+            end
+            if isnumeric(obj.Controllers)
+                gains = obj.Controllers(:);
+                obj.Controllers = arrayfun(@(k) tf(k, 1, -1), gains, ...
+                    'UniformOutput', false);
+                obj.Controllers = [obj.Controllers{:}];
+            end
+        end
+
+        function resolveModels(obj)
+            if isempty(obj.Models)
+                obj.Models = [0.5; 1; 2];
+            end
+            if isnumeric(obj.Models)
+                gains = obj.Models(:);
+                obj.Models = arrayfun(@(k) tf(k, 1, -1), gains, ...
+                    'UniformOutput', false);
+                obj.Models = [obj.Models{:}];
+            end
+        end
+
+        function n = candidateCount(obj)
+            n = max(numel(obj.Controllers), 1);
+        end
+    end
+end
+
+function ehat = computeFictitiousRefs(obj, uActual)
+    n = numel(obj.BCoeffs_);
+    ehat = zeros(n, 1);
+    for i = 1:n
+        b = obj.BCoeffs_{i};
+        a = obj.ACoeffs_{i};
+        M = numel(b) - 1;
+        N = numel(a) - 1;
+
+        num = uActual;
+        if M > 0
+            num = num - b(2:end) * obj.EhatPast_(i, 1:M)';
+        end
+        if N > 0
+            num = num + a(2:end) * obj.UActualPast_(1:N);
+        end
+        ehat(i) = num / b(1);
+    end
+end
+
+function y = applyIIR(b, a, x, xPast, yPast)
+    y = b(1) * x + pastContrib(b, a, xPast, yPast);
+end
+
+function pc = pastContrib(b, a, xPast, yPast)
+    % Past-state contribution of filter b/a given current-sample history
+    % xPast(j) = x(k-j) and yPast(j) = y(k-j):
+    %     sum_{j>=1} b(j+1)*x(k-j) - sum_{j>=1} a(j+1)*y(k-j)
+    M = numel(b) - 1;
+    N = numel(a) - 1;
+    pc = 0;
+    if M > 0
+        pc = pc + b(2:end) * xPast(1:M)';
+    end
+    if N > 0
+        pc = pc - a(2:end) * yPast(1:N)';
+    end
+end
+
+function mat = shiftRows(mat, vals, maxCols)
+    if maxCols > 0
+        mat(:, 2:maxCols) = mat(:, 1:maxCols-1);
+    end
+    mat(:, 1) = vals;
+end
+
+function vec = shiftVec(vec, val, maxN)
+    if maxN > 0
+        vec(2:maxN) = vec(1:maxN-1);
+    end
+    vec(1) = val;
+end
+
+function row = shiftAndInsert(row, val, n)
+    if n > 0
+        row(2:n+1) = row(1:n);
+    end
+    row(1) = val;
 end
