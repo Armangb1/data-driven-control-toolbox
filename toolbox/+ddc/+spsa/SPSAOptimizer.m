@@ -8,13 +8,22 @@ classdef SPSAOptimizer < matlab.System
     %   (STR, MFAC, UFC candidate gains, etc.).
     %
     %   Each gradient estimate requires two loss evaluations, so the
-    %   block operates as a 3-phase cycle driven by successive calls to
-    %   step():
+    %   block operates as a cycle driven by successive calls to step().
+    %   Two cycle modes are available (set via ParameterUpdateMode):
+    %
+    %   "immediate" (default) -- 3-phase cycle:
     %     Phase 1: emit theta + c_k*Delta_k  ("ParamToApply")
     %     Phase 2: receive loss at theta+c_k*Delta_k, emit theta - c_k*Delta_k
     %     Phase 3: receive loss at theta-c_k*Delta_k, form the SPSA
     %              gradient estimate, update theta, emit the new theta
     %              estimate (back to Phase 1)
+    %
+    %   "deferred" -- 2-phase cycle:
+    %     Phase 1: (if a previous J+ is stored: receive J- at theta-c_k*Delta_k,
+    %              form the gradient, update theta), then compute new
+    %              c_k,Delta_k, emit theta + c_k*Delta_k
+    %     Phase 2: receive J+ at theta+c_k*Delta_k, store it, emit
+    %              theta - c_k*Delta_k (back to Phase 1)
     %
     %   Standard decaying gain sequences are used:
     %       a_k = a / (k+1+Abar)^alpha
@@ -34,6 +43,7 @@ classdef SPSAOptimizer < matlab.System
     properties (Nontunable)
         NumParameters (1,1) double {mustBePositive, mustBeInteger} = 1
         InitialTheta (:,1) double = 0
+        ParameterUpdateMode (1,1) string {mustBeMember(ParameterUpdateMode, ["immediate","deferred"])} = "immediate"
     end
 
     properties
@@ -51,6 +61,7 @@ classdef SPSAOptimizer < matlab.System
         Delta_
         Ck_
         LossPlus_
+        HasStoredLoss_
     end
 
     methods
@@ -72,6 +83,7 @@ classdef SPSAOptimizer < matlab.System
             obj.Delta_ = ones(n, 1);
             obj.Ck_ = obj.CTuning;
             obj.LossPlus_ = 0;
+            obj.HasStoredLoss_ = false;
         end
 
         function resetImpl(obj)
@@ -86,31 +98,57 @@ classdef SPSAOptimizer < matlab.System
             obj.Delta_ = ones(n, 1);
             obj.Ck_ = obj.CTuning;
             obj.LossPlus_ = 0;
+            obj.HasStoredLoss_ = false;
         end
 
         function [paramToApply, thetaEstimate] = stepImpl(obj, lossMeasurement)
             n = obj.NumParameters;
 
-            switch obj.Phase_
-                case 1
-                    obj.Ck_ = obj.CTuning / (obj.K_ + 1)^obj.Gamma;
-                    obj.Delta_ = 2*round(rand(n,1)) - 1; % Bernoulli +-1
-                    paramToApply = obj.Theta_ + obj.Ck_ * obj.Delta_;
-                    obj.Phase_ = 2;
+            if obj.ParameterUpdateMode == "deferred"
+                % ---- 2-phase deferred cycle ----
+                switch obj.Phase_
+                    case 1
+                        if obj.HasStoredLoss_
+                            ak = obj.ATuning / (obj.K_ + 1 + obj.ACommon)^obj.Alpha;
+                            ghat = (obj.LossPlus_ - lossMeasurement) ./ (2*obj.Ck_*obj.Delta_);
+                            obj.Theta_ = obj.Theta_ - ak*ghat;
+                            obj.K_ = obj.K_ + 1;
+                        end
+                        obj.HasStoredLoss_ = false;
+                        obj.Ck_ = obj.CTuning / (obj.K_ + 1)^obj.Gamma;
+                        obj.Delta_ = 2*round(rand(n,1)) - 1;
+                        paramToApply = obj.Theta_ + obj.Ck_ * obj.Delta_;
+                        obj.Phase_ = 2;
 
-                case 2
-                    obj.LossPlus_ = lossMeasurement;
-                    paramToApply = obj.Theta_ - obj.Ck_ * obj.Delta_;
-                    obj.Phase_ = 3;
+                    case 2
+                        obj.LossPlus_ = lossMeasurement;
+                        obj.HasStoredLoss_ = true;
+                        paramToApply = obj.Theta_ - obj.Ck_ * obj.Delta_;
+                        obj.Phase_ = 1;
+                end
+            else
+                % ---- 3-phase immediate cycle ----
+                switch obj.Phase_
+                    case 1
+                        obj.Ck_ = obj.CTuning / (obj.K_ + 1)^obj.Gamma;
+                        obj.Delta_ = 2*round(rand(n,1)) - 1;
+                        paramToApply = obj.Theta_ + obj.Ck_ * obj.Delta_;
+                        obj.Phase_ = 2;
 
-                otherwise % case 3
-                    lossMinus = lossMeasurement;
-                    ak = obj.ATuning / (obj.K_ + 1 + obj.ACommon)^obj.Alpha;
-                    ghat = (obj.LossPlus_ - lossMinus) ./ (2*obj.Ck_*obj.Delta_);
-                    obj.Theta_ = obj.Theta_ - ak*ghat;
-                    obj.K_ = obj.K_ + 1;
-                    obj.Phase_ = 1;
-                    paramToApply = obj.Theta_;
+                    case 2
+                        obj.LossPlus_ = lossMeasurement;
+                        paramToApply = obj.Theta_ - obj.Ck_ * obj.Delta_;
+                        obj.Phase_ = 3;
+
+                    otherwise
+                        lossMinus = lossMeasurement;
+                        ak = obj.ATuning / (obj.K_ + 1 + obj.ACommon)^obj.Alpha;
+                        ghat = (obj.LossPlus_ - lossMinus) ./ (2*obj.Ck_*obj.Delta_);
+                        obj.Theta_ = obj.Theta_ - ak*ghat;
+                        obj.K_ = obj.K_ + 1;
+                        obj.Phase_ = 1;
+                        paramToApply = obj.Theta_;
+                end
             end
 
             thetaEstimate = obj.Theta_;
