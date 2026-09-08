@@ -120,7 +120,7 @@ classdef UnfalsifiedSwitchingController < matlab.System
             n = numel(obj.Controllers);
             lam = obj.ForgettingFactor;
 
-            ehat = computeFictitiousRefs(obj, obj.UActualPrev_);
+            ehat = computeFictitiousRefs(obj, uCandidates(obj.ActiveIndex_));
 
             obj.N_ = lam*obj.N_ + obj.W2*uCandidates.^2 + obj.W1*ehat.^2;
             obj.D_ = lam*obj.D_ + (y + ehat).^2;

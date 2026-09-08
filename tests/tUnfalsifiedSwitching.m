@@ -73,12 +73,14 @@ classdef tUnfalsifiedSwitching < matlab.unittest.TestCase
             Ts = 0.1;
             controllers = [tf(0.5,1,Ts); tf(1,1,Ts); tf(2,1,Ts)];
             models = [tf(0.1,[1 -0.95],Ts); tf(0.1,[1 -0.95],Ts); tf(0.1,[1 -0.95],Ts)];
+            bank = ddc.ufc.CandidateControllerBank('Controllers', controllers, 'SampleTime', Ts);
             mm = ddc.ufc.MultimodelSwitchingController( ...
                 'Controllers', controllers, 'Models', models, ...
                 'SampleTime', Ts);
             y = 0;
             for k = 1:100
-                [uSel, idx, costs] = mm.step(1, y);
+                uCand = bank.step(1, y);
+                [uSel, idx, costs] = mm.step(uCand, y);
                 y = 0.8*y + 0.5*uSel;
             end
             testCase.verifyTrue(isfinite(y));

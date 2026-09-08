@@ -8,13 +8,16 @@ classdef MultimodelSwitchingController < matlab.System
     %   scored by comparing the REAL signals against what the pair
     %   predicts, and the lowest-cost pair is switched into the real loop.
     %
-    %   Three loops are involved at each step k:
+    %   The candidate control values are NOT computed internally. They are
+    %   supplied as an input uCandidates (a length-n vector), where
+    %   uCandidates(i) is the control value that candidate controller C_i
+    %   would apply this step (computed upstream, e.g. by
+    %   ddc.ufc.CandidateControllerBank). The controller selected at the
+    %   previous step (one-sample delay, as with a ZOH actuator) drives
+    %   the actual plant, producing the real applied signal pair
+    %   z(k) = [y(k); u(k)].
     %
-    %   (a) REAL loop: each candidate controller C_i is applied to the real
-    %       tracking error e_real(k) = r(k) - y(k) (as in the candidate
-    %       bank); the candidate selected at the previous step (one-sample
-    %       delay, as with a ZOH actuator) drives the actual plant,
-    %       producing the real applied signal pair z(k) = [y(k); u(k)].
+    %   Two loops are involved at each step k:
     %
     %   (b) POTENTIAL loop: for each candidate i the fictitious reference
     %       rtilde_i(k) = ehat_i(k) + y(k) is reconstructed by solving
@@ -27,27 +30,27 @@ classdef MultimodelSwitchingController < matlab.System
     %
     %       with e = rtilde - y, i.e. rtilde_i(k) = ehat_i(k) + y(k).
     %
-%   (c) CANDIDATE loop: rtilde_i(k) is fed into the closed loop of C_i
-%       and the MODEL M_i (not the real plant):
-%
-%           e_i(k) = rtilde_i(k) - y_i(k)
-%           u_i(k) = C_i( e_i(k) )
-%           y_i(k) = M_i( u_i(k) )
-%
-%       Since C_i and M_i have direct feedthrough, this set of equations
-%       is circular and is resolved algebraically per sample using the
-%       past-state (difference-equation) contributions of C_i and M_i:
-%
-%           ucPast_i = recur. terms of C_i from past e_i, u_i
-%           ymPast_i = recur. terms of M_i from past u_i, y_i
-%           y_i(k) = (bM1*bC1*rtilde_i(k) + bM1*ucPast_i + ymPast_i)/(1 + bM1*bC1)
-%           u_i(k) = bC1*(rtilde_i(k) - y_i(k)) + ucPast_i
-%
-%       giving the predicted signal z_i(k) = [y_i(k); u_i(k)] from a
-%       genuine forward simulation with its own internal state per
-%       candidate (both C_i's and M_i's difference-equation states).
-%       When C_i/M_i exactly describe the real loop, z_i(k) reproduces
-%       z(k) = [y(k); u(k)] and the cost V_i stays at zero.
+    %   (c) CANDIDATE loop: rtilde_i(k) is fed into the closed loop of C_i
+    %       and the MODEL M_i (not the real plant):
+    %
+    %           e_i(k) = rtilde_i(k) - y_i(k)
+    %           u_i(k) = C_i( e_i(k) )
+    %           y_i(k) = M_i( u_i(k) )
+    %
+    %       Since C_i and M_i have direct feedthrough, this set of equations
+    %       is circular and is resolved algebraically per sample using the
+    %       past-state (difference-equation) contributions of C_i and M_i:
+    %
+    %           ucPast_i = recur. terms of C_i from past e_i, u_i
+    %           ymPast_i = recur. terms of M_i from past u_i, y_i
+    %           y_i(k) = (bM1*bC1*rtilde_i(k) + bM1*ucPast_i + ymPast_i)/(1 + bM1*bC1)
+    %           u_i(k) = bC1*(rtilde_i(k) - y_i(k)) + ucPast_i
+    %
+    %       giving the predicted signal z_i(k) = [y_i(k); u_i(k)] from a
+    %       genuine forward simulation with its own internal state per
+    %       candidate (both C_i's and M_i's difference-equation states).
+    %       When C_i/M_i exactly describe the real loop, z_i(k) reproduces
+    %       z(k) = [y(k); u(k)] and the cost V_i stays at zero.
     %
     %   COST (corrected): the pair cost is the normalized prediction
     %   error accumulated with exponential forgetting and a running max,
@@ -68,7 +71,7 @@ classdef MultimodelSwitchingController < matlab.System
     %   using c2d with the SampleTime and DiscretizationMethod properties.
     %
     %   Usable as a plain MATLAB object or as a Simulink "MATLAB System"
-    %   block.
+    %   block. Pair with ddc.ufc.CandidateControllerBank.
     %
     %   See also ddc.ufc.UnfalsifiedSwitchingController, ddc.ufc.CandidateControllerBank.
 
@@ -97,10 +100,8 @@ classdef MultimodelSwitchingController < matlab.System
         BMCoeffs_    % model numerator coefficients, one cell per candidate
         AMCoeffs_    % model denominator coefficients, one cell per candidate
         EhatPast_    % fictitious error history, size (n, MaxM_) -- loop (b)
-        UActualPast_ % applied-control history, size (MaxN_, 1) -- loop (a)
+        UActualPast_ % applied-control history, size (MaxN_, 1) -- loop (b)
         UActualPrev_ % last applied control u(k-1)
-        ERealPast_   % real tracking-error history, size (n, MaxM_) -- loop (a)
-        URealPast_   % real control-per-candidate history, size (n, MaxN_) -- loop (a)
         EiPast_      % candidate-loop tracking-error history, size (n, MaxM_) -- loop (c)
         UiPast_      % candidate-loop control history, size (n, max(MaxN_,MaxMM_)) -- loop (c)
         YiPast_      % candidate-loop output history, size (n, MaxNM_) -- loop (c)
@@ -180,9 +181,6 @@ classdef MultimodelSwitchingController < matlab.System
             obj.UActualPast_ = zeros(nC, 1);
             obj.UActualPrev_ = 0;
 
-            obj.ERealPast_ = zeros(n, mC + (obj.MaxM_ > 0));
-            obj.URealPast_ = zeros(n, nC + (obj.MaxN_ > 0));
-
             obj.EiPast_ = zeros(n, mC + (obj.MaxM_ > 0));
             obj.UiPast_ = zeros(n, nU + (max(obj.MaxN_, obj.MaxMM_) > 0));
             obj.YiPast_ = zeros(n, nM + (obj.MaxNM_ > 0));
@@ -204,30 +202,17 @@ classdef MultimodelSwitchingController < matlab.System
             obj.UActualPast_ = zeros(nC, 1);
             obj.UActualPrev_ = 0;
 
-            obj.ERealPast_ = zeros(n, mC + (obj.MaxM_ > 0));
-            obj.URealPast_ = zeros(n, nC + (obj.MaxN_ > 0));
-
             obj.EiPast_ = zeros(n, mC + (obj.MaxM_ > 0));
             obj.UiPast_ = zeros(n, nU + (max(obj.MaxN_, obj.MaxMM_) > 0));
             obj.YiPast_ = zeros(n, nM + (obj.MaxNM_ > 0));
         end
 
-        function [uSelected, activeIndex, costs] = stepImpl(obj, r, y)
+        function [uSelected, activeIndex, costs] = stepImpl(obj, uCandidates, y)
             n = numel(obj.Controllers);
             lam = obj.ForgettingFactor;
 
-            % ---- Loop (a): candidate bank on the real tracking error ----
-            % Each C_i applied to e_real(k) = r(k) - y(k); the candidate
-            % selected at the previous step (one-sample delay, as with a
-            % ZOH actuator) actually drives the plant.
-            eReal = r - y;
-            uCandReal = zeros(n, 1);
-            for i = 1:n
-                uCandReal(i) = applyIIR(obj.BCoeffs_{i}, obj.ACoeffs_{i}, ...
-                    eReal, obj.ERealPast_(i, 1:obj.MaxM_), ...
-                    obj.URealPast_(i, 1:obj.MaxN_));
-            end
-            uSelected = uCandReal(obj.ActiveIndex_);
+            % ---- Select from the externally-provided candidate bank ----
+            uSelected = uCandidates(obj.ActiveIndex_);
 
             % ---- Loop (b): fictitious references from the APPLIED control.
             % The real signal pair this step is z(k) = [y(k); u(k)] with
@@ -280,15 +265,10 @@ classdef MultimodelSwitchingController < matlab.System
             activeIndex = obj.ActiveIndex_;
             costs = obj.V_;
 
-            % ---- Update real-loop memories (loop a) ----
+            % ---- Update loop (b) memories ----
             obj.EhatPast_ = shiftRows(obj.EhatPast_, ehat, obj.MaxM_);
             obj.UActualPast_ = shiftVec(obj.UActualPast_, uSelected, obj.MaxN_);
             obj.UActualPrev_ = uSelected;
-
-            for i = 1:n
-                obj.ERealPast_(i, :) = shiftAndInsert(obj.ERealPast_(i, :), eReal, obj.MaxM_);
-                obj.URealPast_(i, :) = shiftAndInsert(obj.URealPast_(i, :), uCandReal(i), obj.MaxN_);
-            end
 
             % ---- Update candidate-loop memories (loop c) ----
             for i = 1:n
@@ -382,10 +362,6 @@ function ehat = computeFictitiousRefs(obj, uActual)
         end
         ehat(i) = num / b(1);
     end
-end
-
-function y = applyIIR(b, a, x, xPast, yPast)
-    y = b(1) * x + pastContrib(b, a, xPast, yPast);
 end
 
 function pc = pastContrib(b, a, xPast, yPast)

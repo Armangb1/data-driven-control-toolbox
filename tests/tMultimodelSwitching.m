@@ -25,6 +25,7 @@ classdef tMultimodelSwitching < matlab.unittest.TestCase
             controllers = [tf(0.5,1,Ts), tf(2,1,Ts), tf(1,1,Ts)];
             models = [tf(0.3,[1 -0.5],Ts), tf(0.9,[1 -0.95],Ts), Mtrue];
 
+            bank = ddc.ufc.CandidateControllerBank('Controllers', controllers, 'SampleTime', Ts);
             mm = ddc.ufc.MultimodelSwitchingController( ...
                 'Controllers', controllers, 'Models', models, ...
                 'SampleTime', Ts, 'ForgettingFactor', 0.95, ...
@@ -32,7 +33,8 @@ classdef tMultimodelSwitching < matlab.unittest.TestCase
 
             y = 0; idx = 1;
             for k = 1:300
-                [u, idx, costs] = mm.step(1, y);
+                uCand = bank.step(1, y);
+                [u, idx, costs] = mm.step(uCand, y);
                 y = 0.8*y + 0.5*u;
             end
 
@@ -51,13 +53,15 @@ classdef tMultimodelSwitching < matlab.unittest.TestCase
             controllers = [tf(1,1,Ts), tf(2,1,Ts), tf(0.5,1,Ts)];
             models = [Mtrue, tf(0.3,[1 -0.5],Ts), tf(0.9,[1 -0.95],Ts)];
 
+            bank = ddc.ufc.CandidateControllerBank('Controllers', controllers, 'SampleTime', Ts);
             mm = ddc.ufc.MultimodelSwitchingController( ...
                 'Controllers', controllers, 'Models', models, ...
                 'ForgettingFactor', 0.95);
 
             y = 0; idx = 1; costs = [1;1;1];
             for k = 1:300
-                [u, idx, costs] = mm.step(1, y);
+                uCand = bank.step(1, y);
+                [u, idx, costs] = mm.step(uCand, y);
                 y = 0.8*y + 0.5*u;
                 testCase.verifyEqual(costs(1), 0, 'AbsTol', 1e-12);
             end
@@ -74,13 +78,15 @@ classdef tMultimodelSwitching < matlab.unittest.TestCase
             controllers = [piC(0.2, 0.05), piC(2, 1), piC(0.8, 0.2)];
             models = [tf(0.1,[1 -0.5],Ts), tf(0.9,[1 -0.95],Ts), Mtrue];
 
+            bank = ddc.ufc.CandidateControllerBank('Controllers', controllers, 'SampleTime', Ts);
             mm = ddc.ufc.MultimodelSwitchingController( ...
                 'Controllers', controllers, 'Models', models, ...
                 'SampleTime', Ts, 'ForgettingFactor', 0.95);
 
             y = 0; idx = 1;
             for k = 1:300
-                [u, idx, costs] = mm.step(1, y);
+                uCand = bank.step(1, y);
+                [u, idx, costs] = mm.step(uCand, y);
                 y = 0.8*y + 0.5*u;
             end
 
@@ -101,6 +107,8 @@ classdef tMultimodelSwitching < matlab.unittest.TestCase
             C_disc = c2d(C_cont, Ts, 'zoh');
             models = [Mtrue_d, tf(0.1, [1 -0.99], Ts)];
 
+            bankA = ddc.ufc.CandidateControllerBank('Controllers', C_cont, 'SampleTime', Ts);
+            bankB = ddc.ufc.CandidateControllerBank('Controllers', C_disc);
             mmA = ddc.ufc.MultimodelSwitchingController( ...
                 'Controllers', C_cont, 'Models', models, 'SampleTime', Ts);
             mmB = ddc.ufc.MultimodelSwitchingController( ...
@@ -109,8 +117,10 @@ classdef tMultimodelSwitching < matlab.unittest.TestCase
             uA = zeros(1, 5); uB = zeros(1, 5);
             yA = 0; yB = 0;
             for k = 1:5
-                [uA(k), ~, ~] = mmA.step(0.5, yA);
-                [uB(k), ~, ~] = mmB.step(0.5, yB);
+                uCandA = bankA.step(0.5, yA);
+                uCandB = bankB.step(0.5, yB);
+                [uA(k), ~, ~] = mmA.step(uCandA, yA);
+                [uB(k), ~, ~] = mmB.step(uCandB, yB);
                 yA = 0.453173*uA(k) + 0.818731*yA;
                 yB = 0.453173*uB(k) + 0.818731*yB;
             end
@@ -120,12 +130,14 @@ classdef tMultimodelSwitching < matlab.unittest.TestCase
         function testNumericGainsAccepted(testCase)
             % Controllers/Models as plain numeric vectors wrap to tf and
             % the block runs, produces finite outputs and valid indices.
+            bank = ddc.ufc.CandidateControllerBank('Controllers', [0.5; 1; 2]);
             mm = ddc.ufc.MultimodelSwitchingController( ...
                 'Controllers', [0.5; 1; 2], 'Models', [0.5; 1; 2], ...
                 'ForgettingFactor', 0.9);
             y = 0;
             for k = 1:100
-                [u, idx, costs] = mm.step(1, y);
+                uCand = bank.step(1, y);
+                [u, idx, costs] = mm.step(uCand, y);
                 y = 0.8*y + 0.5*u;
             end
             testCase.verifyTrue(isfinite(u));
@@ -149,18 +161,22 @@ classdef tMultimodelSwitching < matlab.unittest.TestCase
             % accumulators so a fresh first step has zero cost.
             Ts = 1;
             Mtrue = tf(0.5, [1 -0.8], Ts);
+            bank = ddc.ufc.CandidateControllerBank('Controllers', tf(1, 1, Ts), 'SampleTime', Ts);
             mm = ddc.ufc.MultimodelSwitchingController( ...
                 'Controllers', tf(1, 1, Ts), 'Models', Mtrue, ...
                 'ForgettingFactor', 0.9);
 
             y = 0;
             for k = 1:20
-                [~, ~, ~] = mm.step(1, y);
+                uCand = bank.step(1, y);
+                [~, ~, ~] = mm.step(uCand, y);
                 y = 0.8*y + 0.5*1; % plant driven by previous u
             end
 
             mm.reset();
-            [~, ~, costs] = mm.step(1, 0);
+            bank.reset();
+            uCand = bank.step(1, 0);
+            [~, ~, costs] = mm.step(uCand, 0);
             testCase.verifyEqual(costs, 0, 'AbsTol', 1e-12);
         end
     end
