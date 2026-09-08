@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest a new feature, algorithm, or improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: What problem would this solve, or which scenario is missing?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the feature and, if applicable, which section of Khaki-Sedigh (2024) it relates to.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Workarounds or existing functionality that partially covers this.
+    validations:
+      required: false
+  - type: dropdown
+    id: area
+    attributes:
+      label: Component
+      description: Which part of the toolbox would this affect?
+      options:
+        - DeePC (ddc.deepc)
+        - MFAC (ddc.mfac)
+        - UFC / switching (ddc.ufc)
+        - SPSA (ddc.spsa)
+        - STR (ddc.str)
+        - VRFT (ddc.vrft)
+        - Common utilities (ddc.common)
+        - Simulink library (ddc_lib.slx)
+        - Build / packaging
+        - Tests
+        - Documentation
+        - Other
+    validations:
+      required: true

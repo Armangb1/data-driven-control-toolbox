@@ -1,5 +1,21 @@
 # Data-Driven Control Toolbox
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![GitHub issues](https://img.shields.io/github/issues/Armangb1/data-driven-control-toolbox)](https://github.com/Armangb1/data-driven-control-toolbox/issues)
+[![GitHub contributors](https://img.shields.io/github/contributors/Armangb1/data-driven-control-toolbox)](https://github.com/Armangb1/data-driven-control-toolbox/graphs/contributors)
+
+A **MATLAB/Simulink toolbox** implementing the data-driven and adaptive control
+methodologies from
+[*An Introduction to Data-Driven Control Systems*](https://doi.org/10.1002/9781394196432)
+(A. Khaki-Sedigh, Wiley, 2024). Packaged as both a Simulink block library
+and plain MATLAB classes.
+
+> **Disclaimer:** This toolbox is an independent, unofficial project created by
+> a student of Prof. Khaki-Sedigh. It is **not** endorsed by, affiliated with,
+> or officially connected to the author or the publisher of the book.
+
+## Features
+
 A MATLAB/Simulink toolbox for data-driven and adaptive control, covering:
 
 - **DeePC** — Data-Enabled Predictive Control (Willems' Fundamental Lemma)
@@ -12,6 +28,23 @@ A MATLAB/Simulink toolbox for data-driven and adaptive control, covering:
 The primary deliverable is a **Simulink block library**; every stateful algorithm is implemented
 as a `matlab.System` class so it can be used both as a Simulink "MATLAB System" block and as a
 plain MATLAB object (for offline simulation, unit testing, or scripting).
+
+## Requirements
+
+- MATLAB **R2024a or newer** (recommended), with **Simulink** for the block
+  library.
+- No third-party toolboxes are required; the test suite is self-contained.
+
+## Installation
+
+Install the packaged toolbox from the MATLAB **Add-On Explorer**, or build it
+locally (see [Packaging](#packaging)):
+
+```matlab
+run('tools/devPath.m')   % add toolbox/ and toolbox/lib to the MATLAB path
+```
+
+For development, see [Contributing](CONTRIBUTING.md).
 
 ## Repository Layout
 
@@ -68,6 +101,34 @@ Simulink editor and re-save -- the two are meant to stay consistent).
 
 All shipped functions/classes live under the `ddc` package (`ddc.<category>.<Name>`) and all
 Simulink library files are prefixed `ddc_*` to avoid collisions with other toolboxes.
+
+## Book Chapter Mapping
+
+Each toolbox component corresponds to a chapter of Khaki-Sedigh (2024):
+
+| Component                         | Package            | Book chapter                                        |
+| --------------------------------- | ------------------ | --------------------------------------------------- |
+| Unfalsified switching control     | `ddc.ufc`          | Ch. 3 (Unfalsified Adaptive Switching)              |
+| Multi-model switching control     | `ddc.ufc`          | Ch. 4 (Multi-Model Unfalsified Switching)           |
+| VRFT controller design            | `ddc.vrft`         | Ch. 5 (Virtual Reference Feedback Tuning)           |
+| SPSA-based tuning                 | `ddc.spsa`         | Ch. 6 (Simultaneous Perturbation Stochastic Approx.)|
+| DeePC (Fundamental Lemma)         | `ddc.deepc`        | Ch. 7 (Data-Driven Control Based on the Fundamental Lemma) |
+| Model-Free Adaptive Control       | `ddc.mfac`         | Ch. 9 (Model-Free Adaptive Control)                 |
+| STR baselines                     | `ddc.str`          | Ch. 1 (Introducing the classical baselines)         |
+
+## How to Cite
+
+If you use this toolbox in research or coursework, please cite it together with
+the reference book. See [CITATION.cff](CITATION.cff) for a machine-readable
+citation (BibTeX / APA can be generated from it on GitHub).
+
+> **Note:** Citing this toolbox does not imply endorsement by the book's author.
+
+## Contributing
+
+Contributions are welcome! Please read
+[CONTRIBUTING.md](CONTRIBUTING.md) for setup, conventions, and the pull request
+process, and note our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 

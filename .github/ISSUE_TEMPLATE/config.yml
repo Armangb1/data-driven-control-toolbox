@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: MathWorks File Exchange / Add-On Explorer
+    url: https://www.mathworks.com/matlabcentral/fileexchange/
+    about: The packed .mltbx can be installed from the Add-On Explorer in MATLAB.
+  - name: Reference book
+    url: https://doi.org/10.1002/9781394196432
+    about: "An Introduction to Data-Driven Control Systems" by A. Khaki-Sedigh (Wiley, 2024) — the book that inspired this toolbox (unofficial, not endorsed by the author).

@@ -1,0 +1,44 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software in your work, please cite it together with the
+  reference book that inspired the toolbox. Note: this toolbox is unofficial
+  and not endorsed by the book's author.
+title: "Data-Driven Control Toolbox"
+abstract: >-
+  A MATLAB/Simulink toolbox implementing the data-driven and adaptive control
+  methodologies presented in Ali Khaki-Sedigh's "An Introduction to
+  Data-Driven Control Systems" (Wiley, 2024): DeePC, MFAC, Unfalsified
+  Switching Control (single- and multi-model), SPSA, Self-Tuning Regulators,
+  and VRFT. All stateful algorithms are matlab.System classes usable both as
+  Simulink blocks and as plain MATLAB objects.
+keywords:
+  - MATLAB
+  - Simulink
+  - data-driven control
+  - DeePC
+  - MFAC
+  - UFC
+  - SPSA
+  - STR
+  - VRFT
+  - adaptive control
+type: software
+license: MIT
+version: "0.1.0"
+date-released: "2026-09-07"
+authors:
+  - family-names: "Gholibeikian"
+    given-names: "Arman"
+    email: "arman.ghbn@gmail.com"
+preferred-citation:
+  type: book
+  title: "An Introduction to Data-Driven Control Systems"
+  authors:
+    - family-names: "Khaki-Sedigh"
+      given-names: "Ali"
+  publisher: "John Wiley & Sons"
+  address: "Hoboken, NJ"
+  year: 2024
+  isbn: "9781394196401"
+  doi: "10.1002/9781394196432"
+  url: "https://doi.org/10.1002/9781394196432"

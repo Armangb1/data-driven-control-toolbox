@@ -1,0 +1,60 @@
+name: Bug report
+description: Report a bug or unexpected behavior in the toolbox
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug. Please fill in as much as you can.
+  - type: input
+    id: version
+    attributes:
+      label: Toolbox version
+      description: Tag or version you are using (e.g. `v0.1.0`, `main`, or the ToolboxVersion in buildToolbox.m)
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: MATLAB release and operating system
+      placeholder: e.g. MATLAB R2024a on Ubuntu 22.04
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Minimal script or Simulink model that triggers the issue, with the full error message.
+      render: matlab
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Component
+      description: Which part of the toolbox is affected?
+      options:
+        - DeePC (ddc.deepc)
+        - MFAC (ddc.mfac)
+        - UFC / switching (ddc.ufc)
+        - SPSA (ddc.spsa)
+        - STR (ddc.str)
+        - VRFT (ddc.vrft)
+        - Common utilities (ddc.common)
+        - Simulink library (ddc_lib.slx)
+        - Build / packaging
+        - Tests
+        - Documentation
+        - Other
+    validations:
+      required: true
