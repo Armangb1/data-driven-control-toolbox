@@ -67,6 +67,53 @@ classdef tCommonUtils < matlab.unittest.TestCase
             testCase.verifyEqual(theta, trueTheta, 'AbsTol', 1e-3);
         end
 
+        function testRLSEstimatorExternalResetEquivalent(testCase)
+            % With the reset input held false, the 3-input form must be
+            % identical to the default 2-input RLS.
+            rng(7);
+            trueTheta = [3; -2];
+            estDef = ddc.common.RLSEstimator('NumParameters', 2);
+            estExt = ddc.common.RLSEstimator('NumParameters', 2, 'ExternalReset', true);
+            for k = 1:20
+                phi = randn(2, 1);
+                y = trueTheta.' * phi;
+                [tDef, eDef] = estDef.step(phi, y);
+                [tExt, eExt] = estExt.step(phi, y, false);
+                testCase.verifyEqual(tExt, tDef, 'AbsTol', 1e-12);
+                testCase.verifyEqual(eExt, eDef, 'AbsTol', 1e-12);
+            end
+        end
+
+        function testRLSEstimatorExternalResetReadapts(testCase)
+            % A true reset re-initializes the covariance (P -> C*I) so RLS
+            % re-adapts quickly to a changed plant, while leaving theta
+            % finite. With P converged to ~0 and no reset, theta barely moves.
+            rng(11);
+            theta0 = [3; -2];
+            theta1 = [2; 5];
+
+            estR = ddc.common.RLSEstimator('NumParameters', 2, 'ExternalReset', true);
+            estN = ddc.common.RLSEstimator('NumParameters', 2, 'ExternalReset', true);
+            for k = 1:300
+                phi = randn(2, 1);
+                y = theta0.' * phi;
+                estR.step(phi, y, false);
+                estN.step(phi, y, false);
+            end
+
+            phiNew = randn(2, 1);
+            yNew = theta1.' * phiNew;
+            [thetaR, ~] = estR.step(phiNew, yNew, true);   % covariance reset
+            [thetaN, ~] = estN.step(phiNew, yNew, false);  % P ~ 0, no reset
+
+            % Without reset, P is nearly converged: theta barely moves.
+            testCase.verifyEqual(thetaN, theta0, 'AbsTol', 0.1);
+            % With reset, P is re-initialized: theta re-adapts strongly
+            % toward the new plant.
+            testCase.verifyGreaterThan(norm(thetaR - theta0), 1);
+            testCase.verifyLessThan(norm(thetaR - theta1), norm(thetaN - theta1));
+        end
+
         function testExcitationSignalGeneratorPRBSBounded(testCase)
             gen = ddc.common.ExcitationSignalGenerator('SignalType', 'prbs', 'Amplitude', 2);
             vals = zeros(1, 20);

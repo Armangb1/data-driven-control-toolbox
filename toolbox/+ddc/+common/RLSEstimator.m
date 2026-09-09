@@ -9,15 +9,32 @@ classdef RLSEstimator < matlab.System
     %   K_k     = P_{k-1} * phi_k / (lambda + phi_k' * P_{k-1} * phi_k)
     %   P_k     = (P_{k-1} - K_k * phi_k' * P_{k-1}) / lambda
     %
+    %   When ExternalReset is true, the object accepts a third scalar
+    %   logical input, reset. A true reset only re-initializes the
+    %   covariance matrix P = InitialCovarianceGain * eye(NumParameters),
+    %   leaving Theta unchanged, and then performs the normal RLS update on
+    %   the current phi,y sample with the re-initialized covariance.
+    %   This differs from resetImpl(), which resets both Theta and P.
+    %
     %   Example (MATLAB):
     %       est = ddc.common.RLSEstimator('NumParameters', 3, ...
     %                                      'ForgettingFactor', 0.98);
     %       [theta, err] = est.step(phi, y);
     %
+    %   Example (MATLAB) with external covariance reset:
+    %       est = ddc.common.RLSEstimator('NumParameters', 3, ...
+    %                                      'ExternalReset', true);
+    %       [theta, err] = est.step(phi, y, reset);
+    %
     %   See also ddc.str.IndirectSTRController, ddc.mfac.MFACController.
 
     properties (Nontunable)
         NumParameters    (1,1) double {mustBePositive, mustBeInteger} = 1
+        % ExternalReset Enable a scalar logical reset input that
+        %   re-initializes only the covariance matrix P before the current
+        %   RLS update, leaving Theta unchanged. Must be nontunable because
+        %   it changes the number of inputs.
+        ExternalReset    (1,1) logical = false
     end
 
     properties
@@ -50,9 +67,18 @@ classdef RLSEstimator < matlab.System
             obj.P = obj.InitialCovarianceGain * eye(n);
         end
 
-        function [theta, predictionError] = stepImpl(obj, phi, y)
+        function [theta, predictionError] = stepImpl(obj, varargin)
+            phi = varargin{1};
+            y = varargin{2};
+
             phi = phi(:);
             lambda = obj.ForgettingFactor;
+
+            % External covariance reset: re-initialize only P, keep Theta.
+            if obj.ExternalReset && varargin{3}
+                n = obj.NumParameters;
+                obj.P = obj.InitialCovarianceGain * eye(n);
+            end
 
             Pphi = obj.P * phi;
             denom = lambda + phi.' * Pphi;
@@ -85,8 +111,20 @@ classdef RLSEstimator < matlab.System
             fz2 = true;
         end
 
-        function num = getNumInputsImpl(~)
-            num = 2;
+        function num = getNumInputsImpl(obj)
+            if obj.ExternalReset
+                num = 3;
+            else
+                num = 2;
+            end
+        end
+
+        function varargout = getInputNamesImpl(obj)
+            varargout{1} = 'phi';
+            varargout{2} = 'y';
+            if obj.ExternalReset
+                varargout{3} = 'reset';
+            end
         end
 
         function num = getNumOutputsImpl(~)
