@@ -16,6 +16,9 @@ Do **not** add `toolbox/+ddc` itself to path; only `toolbox/` for package resolu
 - All shipped code lives under `toolbox/+ddc/` (MATLAB package namespace).
 - Categories: `+common`, `+deepc`, `+mfac`, `+spsa`, `+str`, `+ufc`, `+vrft`.
 - Each category contains `matlab.System` classes (stateful, usable in Simulink or plain MATLAB) and helper functions.
+- `+str` also contains a `+mdpp` sub-package: the polynomial pole-placement design engine
+  (`ddc.str.mdpp.mdpp_design` et al.), which is the general higher-order design method
+  behind the STR controllers.
 - Simulink library: `toolbox/lib/ddc_lib.slx` — single browsable node in Library Browser, registered by `toolbox/lib/slblocks.m`.
 - Library contents are defined in `tools/buildLibraries.m`; re-run after adding/removing blocks, or hand-edit in Simulink editor and re-save.
 

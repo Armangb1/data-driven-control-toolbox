@@ -4,6 +4,18 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- `+ddc/+str/+mdpp`: Minimum-Degree Pole Placement design engine (discrete-time,
+  Astrom-Wittenmark Algorithm 3.1) for self-tuning regulators. Polynomial-based
+  controller design via B-factoring, Diophantine (Sylvester) solving, and causality
+  checks, with structured `MDPP:*` error identifiers and a unit-test class
+  (`tests/MDPPDesignTest.m`). Resolves as `ddc.str.mdpp.*` and is included
+  in the `.mltbx` build automatically.
+- `ddc.str.mdpp`: `mdpp_design` and the public `toPoly` helper accept SISO `tf`, `zpk`,
+  and `ss` model objects (Control System Toolbox) for the `A`, `B`, `Am`, `Bm`, `Ao`
+  inputs, with `B` derivable from a model object. Numeric polynomial inputs and full
+  base-MATLAB operation are unchanged.
+
 ## [0.1.0]
 
 ### Added
