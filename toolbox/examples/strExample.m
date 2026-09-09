@@ -18,8 +18,12 @@ for k = 1:Tsim
     ydLog(k) = yd;
 end
 
-% Indirect STR
-ictrl = ddc.str.IndirectSTRController('Ac1', -0.5);
+% Indirect STR (general ARX pole placement)
+%   plant: A y(k) = B u(k)  =>  y(k) = 0.8*y(k-1) + 1.0*u(k)
+%   desired CL pole at z = 0.5 (Am = [1 -0.5]), unity DC gain (Bm = [0.5])
+ictrl = ddc.str.IndirectSTRController( ...
+    'Na', 1, 'Nb', 1, ...
+    'Am', [1 -0.5], 'Bm', [0.5]);
 yi = 0; yiLog = zeros(1,Tsim);
 for k = 1:Tsim
     [u, ~] = ictrl.step(yi, r(k));
