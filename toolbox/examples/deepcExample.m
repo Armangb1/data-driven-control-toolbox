@@ -54,15 +54,16 @@ ctrl = ddc.deepc.DeePCController( ...
     'Q', 10, 'R', 1, 'LambdaG', 1, 'LambdaY', 1e4);
 
 % Collect initial open-loop data for the DeePC initial-condition window.
-% Without this, uHist=yHist=zeros forces the QP constraint Up*g=0,
+% Without this, zero history forces the QP constraint Up*g=0,
 % preventing the controller from moving the plant.
 rng(1);
-uHist = 2*(rand(1, Tini) - 0.5);   % short PRBS burst
-yHist = zeros(1, Tini);
 y0 = 0;
+yHist = zeros(1, Tini);
 for k = 1:Tini
-    y0 = -a1*y0 + b1*uHist(k);
+    uInit = 2*(rand - 0.5);   % short PRBS burst
+    y0 = -a1*y0 + b1*uInit;
     yHist(k) = y0;
+    ctrl.step(y0, ones(1, N)); % seed the controller's internal history
 end
 
 Tsim   = 80;
@@ -72,11 +73,9 @@ uLog   = zeros(1, Tsim);
 
 y = yHist(end);
 for k = 1:Tsim
-    uApply = ctrl.step(uHist, yHist, rSim(k)*ones(1, N));
+    uApply = ctrl.step(y, rSim(k)*ones(1, N));
     y = -a1*y + b1*uApply + 0.005*randn;
 
-    uHist = [uHist(2:end), uApply];
-    yHist = [yHist(2:end), y];
     yLog(k) = y;
     uLog(k) = uApply;
 end

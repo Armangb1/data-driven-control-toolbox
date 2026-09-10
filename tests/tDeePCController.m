@@ -37,20 +37,18 @@ classdef tDeePCController < matlab.unittest.TestCase
                 yD(k+1) = 0.8*yD(k) + uD(k);
             end
 
-            ctrl = ddc.deepc.DeePCController('DataU', uD, 'DataY', yD, ...
+ctrl = ddc.deepc.DeePCController('DataU', uD, 'DataY', yD, ...
                 'Tini', Tini, 'N', N, ...
                 'Q', 1, 'R', 0.001, 'LambdaG', 0.1, 'LambdaY', 1e5);
 
             % Closed-loop simulation against the same first-order plant.
-            uHist = zeros(1, Tini);
-            yHist = zeros(1, Tini);
+            % Controller maintains its own input/output history buffers
+            % internally via LastU_ and the UBuf_/YBuf_ mechanism.
             y = 0;
             rFuture = ones(1, N);
             for k = 1:40
-                uApply = ctrl.step(uHist, yHist, rFuture);
+                uApply = ctrl.step(y, rFuture);
                 y = 0.8*y + uApply;
-                uHist = [uHist(2:end), uApply];
-                yHist = [yHist(2:end), y];
             end
             testCase.verifyEqual(y, 1, 'AbsTol', 0.05);
         end

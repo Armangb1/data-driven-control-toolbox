@@ -26,7 +26,7 @@ classdef DeePCController < matlab.System
     %   Example (MATLAB):
     %       ctrl = ddc.deepc.DeePCController('DataU', uData, 'DataY', yData, ...
     %           'Tini', 4, 'N', 10);
-    %       uApply = ctrl.step(uIni, yIni, rFuture);
+    %       uApply = ctrl.step(yCurr, rFuture);
     %
     %   See also ddc.deepc.deepcDesign, ddc.common.HankelBuilder.
 
@@ -60,6 +60,8 @@ classdef DeePCController < matlab.System
         UtU_      % Uf.'*Uf (cached for H)
         Aeq_      % invariant equality-constraint matrix [Up 0; Yp -I]
         LastU_    % last successfully applied input (fallback)
+        UBuf_     % m-by-Tini buffer of past applied inputs (oldest->newest)
+        YBuf_     % p-by-Tini buffer of past measured outputs (oldest->newest)
         QuadprogOpts_
     end
 
@@ -95,36 +97,45 @@ classdef DeePCController < matlab.System
             obj.Aeq_ = [design.Up, zeros(size(design.Up, 1), size(design.Yp, 1)); ...
                         design.Yp, -eye(size(design.Yp, 1))];
             obj.LastU_ = zeros(size(obj.DataU, 1), 1);
-            obj.QuadprogOpts_ = optimoptions('quadprog', 'Display', 'none');
+            obj.UBuf_ = zeros(obj.InputDimension, obj.Tini);
+            obj.YBuf_ = zeros(obj.OutputDimension, obj.Tini);
+            obj.QuadprogOpts_ = optimoptions('quadprog', 'Display', 'none','MaxIterations',5);
         end
 
         function resetImpl(obj)
             obj.LastU_ = zeros(size(obj.DataU, 1), 1);
+            obj.UBuf_ = zeros(obj.InputDimension, obj.Tini);
+            obj.YBuf_ = zeros(obj.OutputDimension, obj.Tini);
         end
 
-        function [uApply, yPred] = stepImpl(obj, uIni, yIni, rFuture)
+        %NOTE: This buffer-based formulation assumes the input actually
+        %          applied to the plant equals the controller's own computed
+        %          uApply (no external saturation, override, or switching
+        %          between the controller output and the plant). If that
+        %          assumption does not hold, feed uPrev externally instead.
+        function [uApply, yPred] = stepImpl(obj, yCurr, rFuture)
             m = obj.InputDimension;
             p = obj.OutputDimension;
             Nh = obj.N;
 
-            if numel(uIni) ~= m * obj.Tini
-                error('ddc:deepc:DeePCController:BadUIni', ...
-                    'uIni must have length %d (= InputDimension*Tini), got %d.', ...
-                    m * obj.Tini, numel(uIni));
+            if numel(yCurr) ~= p
+                error('ddc:deepc:DeePCController:BadYCurr', ...
+                    'yCurr must have length %d (= OutputDimension), got %d.', ...
+                    p, numel(yCurr));
             end
-            if numel(yIni) ~= p * obj.Tini
-                error('ddc:deepc:DeePCController:BadYIni', ...
-                    'yIni must have length %d (= OutputDimension*Tini), got %d.', ...
-                    p * obj.Tini, numel(yIni));
-            end
+
+            obj.UBuf_ = [obj.UBuf_(:, 2:end), obj.LastU_];
+            obj.YBuf_ = [obj.YBuf_(:, 2:end), yCurr(:)];
+
+            u_ini = obj.UBuf_(:);
+            y_ini = obj.YBuf_(:);
+
             if numel(rFuture) ~= p * Nh
                 error('ddc:deepc:DeePCController:BadRFuture', ...
                     'rFuture must have length %d (= OutputDimension*N), got %d.', ...
                     p * Nh, numel(rFuture));
             end
 
-            u_ini = uIni(:);
-            y_ini = yIni(:);
             r_future = rFuture(:);
 
             Uf = obj.Uf_; Yf = obj.Yf_;
@@ -178,7 +189,7 @@ classdef DeePCController < matlab.System
         end
 
         function num = getNumInputsImpl(~)
-            num = 3;
+            num = 2;
         end
 
         function num = getNumOutputsImpl(~)
