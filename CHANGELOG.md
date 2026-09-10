@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 ## [Unreleased]
 
 ### Added
+- `ddc.mfac.MFACController`: generalized commit-form MFAC to the Full-Form
+  Dynamic Linearization (FFDL) scheme. CFDL and PFDL are now parameter presets:
+  `CFDL <=> Ly=0, Lu=1`, `PFDL <=> Ly=0, Lu=L`, `FFDL <=>` general `Ly, Lu`.
+  New `Ly`/`Lu` pseudo-orders drive a vector PPD/PG estimate (projection
+  algorithm + reset) and the full Hou & Jin control law with both delta-y and
+  delta-u terms; `PhiInit`/`Rho` accept scalars or vectors of length `Ly+Lu`,
+  and the second output remains the scalar `phi(Ly+1)` for backward
+  compatibility. `tests/tMFACController.m` now covers CFDL regression (golden),
+  PFDL/FFDL equivalence against an independent reference, the `phi(Ly+1)` reset
+  rule, the K.N.Toosi plant example, and input validation.
 - `+ddc/+str/+mdpp`: Minimum-Degree Pole Placement design engine (discrete-time,
   Astrom-Wittenmark Algorithm 3.1) for self-tuning regulators. Polynomial-based
   controller design via B-factoring, Diophantine (Sylvester) solving, and causality
