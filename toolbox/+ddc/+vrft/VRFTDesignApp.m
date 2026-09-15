@@ -30,6 +30,7 @@ classdef VRFTDesignApp < handle
 
         % --- Data tab state ---
         Ts double = 0.1
+        TsSource string = "0.1"
         DataU double = []
         DataY double = []
 
@@ -64,6 +65,7 @@ classdef VRFTDesignApp < handle
         MatYVarField
         CsvFileField
         TsField
+        TsStatusLabel
         DataStatusLabel
         DataAxesU
         DataAxesY
@@ -118,6 +120,7 @@ classdef VRFTDesignApp < handle
             %GETFIGURE Return the app's uifigure handle.
             fig = app.Figure;
         end
+
     end
 
     methods (Access = private)
@@ -175,11 +178,12 @@ classdef VRFTDesignApp < handle
             app.DataMatPanel.Visible = 'off';
             app.DataCsvPanel.Visible = 'off';
 
-            bottomGrid = uigridlayout(sideGrid, [3 1]);
-            bottomGrid.RowHeight = {'fit', 'fit', 'fit'};
-            uilabel(bottomGrid, 'Text', 'Sample time Ts (s):');
-            app.TsField = uieditfield(bottomGrid, 'numeric', 'Value', app.Ts, 'Limits', [0 Inf], ...
+            bottomGrid = uigridlayout(sideGrid, [4 1]);
+            bottomGrid.RowHeight = {'fit', 'fit', 'fit', 'fit'};
+            uilabel(bottomGrid, 'Text', 'Sample time Ts (s) or workspace var:');
+            app.TsField = uieditfield(bottomGrid, 'text', 'Value', char(app.TsSource), ...
                 'ValueChangedFcn', @(src, ~) app.onTsChanged(src.Value));
+            app.TsStatusLabel = uilabel(bottomGrid, 'Text', '', 'FontColor', app.Theme.error);
             uibutton(bottomGrid, 'Text', 'Load Data', ...
                 'ButtonPushedFcn', @(~, ~) app.onLoadDataPressed());
 
@@ -401,12 +405,51 @@ classdef VRFTDesignApp < handle
             end
         end
 
-        function onTsChanged(app, value)
-            app.Ts = value;
+        function onTsChanged(app, input)
+            app.TsSource = string(input);
+            try
+                app.Ts = app.resolveTs(string(input));
+                app.TsStatusLabel.Text = '';
+            catch ME
+                app.TsStatusLabel.Text = ME.message;
+            end
+        end
+
+        function value = resolveTs(app, input)
+            %RESOLVETS Resolve a literal number or workspace variable name to
+            %a positive scalar sampling time.
+            input = strtrim(string(input));
+            if input == ""
+                error('ddc:vrft:VRFTDesignApp:EmptyTs', 'Ts is empty.');
+            end
+            value = str2double(input);
+            if ~isnan(value)
+                if value <= 0 || ~isfinite(value)
+                    error('ddc:vrft:VRFTDesignApp:InvalidTs', ...
+                        'Ts must be a positive finite number.');
+                end
+                return;
+            end
+            if ~isvarname(input)
+                error('ddc:vrft:VRFTDesignApp:InvalidTsExpression', ...
+                    'Ts must be a number or a valid workspace variable name.');
+            end
+            value = app.readWorkspaceVariable(input);
+            if ~isscalar(value) || ~isnumeric(value) || value <= 0 || ~isfinite(value)
+                error('ddc:vrft:VRFTDesignApp:InvalidTsVar', ...
+                    'Workspace variable ''%s'' must be a positive finite scalar.', char(input));
+            end
         end
 
         function onLoadDataPressed(app)
             app.DataStatusLabel.Text = '';
+            try
+                app.Ts = app.resolveTs(app.TsSource);
+                app.TsStatusLabel.Text = '';
+            catch ME
+                app.DataStatusLabel.Text = ['Cannot resolve Ts: ' ME.message];
+                return;
+            end
             try
                 source = app.buildDataSourceStruct();
                 data = ddc.vrft.importTimeSeriesData(source);
