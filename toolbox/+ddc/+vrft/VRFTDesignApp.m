@@ -11,7 +11,8 @@ classdef VRFTDesignApp < handle
     %     5. Run        - call ddc.vrft.vrftDesign and surface any error as
     %                     a status message / dialog.
     %     6. Results    - inspect theta, C(z,theta), and the VRFT
-    %                     diagnostic signals (rv, ev, ef, uf); export.
+    %                     diagnostic signals (rv, ev, ef, uf); export a
+    %                     struct with fields theta and controller.
     %
     %   This class contains ONLY UI construction and callback wiring. All
     %   computation is delegated to small, independently testable
@@ -752,6 +753,9 @@ classdef VRFTDesignApp < handle
         end
 
         function onExportPressed(app)
+            result.theta = app.LastTheta;
+            result.controller = app.LastController;
+
             choice = uiconfirm(app.Figure, ...
                 'Export results to the base workspace or to a .mat file?', ...
                 'Export VRFT Results', ...
@@ -760,20 +764,16 @@ classdef VRFTDesignApp < handle
 
             switch choice
                 case 'Workspace'
-                    assignin('base', 'theta', app.LastTheta);
-                    assignin('base', 'C', app.LastController);
-                    assignin('base', 'info', app.LastInfo);
-                    uialert(app.Figure, 'Exported theta, C, and info to the base workspace.', ...
+                    assignin('base', 'vrftResult', result);
+                    uialert(app.Figure, 'Exported vrftResult to the base workspace.', ...
                         'Export Complete', 'Icon', 'success');
                 case 'MAT file'
                     [fileName, pathName] = uiputfile('*.mat', 'Save VRFT Results');
                     if isequal(fileName, 0)
                         return;
                     end
-                    theta = app.LastTheta;
-                    C = app.LastController;
-                    info = app.LastInfo;
-                    save(fullfile(pathName, fileName), 'theta', 'C', 'info');
+                    vrftResult = result;
+                    save(fullfile(pathName, fileName), 'vrftResult');
                     uialert(app.Figure, sprintf('Saved to %s', fullfile(pathName, fileName)), ...
                         'Export Complete', 'Icon', 'success');
             end
