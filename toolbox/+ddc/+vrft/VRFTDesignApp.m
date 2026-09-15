@@ -583,17 +583,15 @@ classdef VRFTDesignApp < handle
             isCustom = strcmp(presetName, 'Custom');
             if isCustom
                 app.BasisTable.Enable = 'on';
-            else
-                app.BasisTable.Enable = 'off';
-            end
-            app.BasisTable.ColumnEditable = [false, isCustom];
-            if isCustom
                 app.BasisAddButton.Enable = 'on';
                 app.BasisRemoveButton.Enable = 'on';
             else
+                app.BasisTable.Enable = 'off';
                 app.BasisAddButton.Enable = 'off';
                 app.BasisRemoveButton.Enable = 'off';
+                app.BasisTable.Data = app.basisPresetRows(presetName);
             end
+            app.BasisTable.ColumnEditable = [false, isCustom];
         end
 
         function onAddBasisRow(app)
@@ -808,6 +806,22 @@ classdef VRFTDesignApp < handle
                 sprintf('Numerator:   %s', mat2str(round(num, 6))), ...
                 sprintf('Denominator: %s', mat2str(round(den, 6))), ...
                 sprintf('Ts = %.4g s', C.Ts)};
+        end
+
+        function data = basisPresetRows(presetName)
+            switch lower(presetName)
+                case 'pid'
+                    expressions = {'1'; 'Ts/(z-1)'; '(z-1)/(Ts*z)'};
+                case 'integrator'
+                    expressions = {'Ts/(z-1)'};
+                case 'gain'
+                    expressions = {'1'};
+                otherwise
+                    expressions = {};
+            end
+            n = numel(expressions);
+            data = table((1:n)', expressions, ...
+                'VariableNames', {'Index', 'Expression'});
         end
     end
 end
