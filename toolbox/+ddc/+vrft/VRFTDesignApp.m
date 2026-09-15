@@ -570,7 +570,11 @@ classdef VRFTDesignApp < handle
         %  ------------------------------------------------------------------
         function onBasisPresetChanged(app, presetName)
             isCustom = strcmp(presetName, 'Custom');
-            app.BasisTable.Enable = matlab.lang.OnOffSwitchState(isCustom);
+            if isCustom
+                app.BasisTable.Enable = 'on';
+            else
+                app.BasisTable.Enable = 'off';
+            end
             app.BasisTable.ColumnEditable = [false, isCustom];
         end
 
@@ -603,7 +607,11 @@ classdef VRFTDesignApp < handle
         %  ------------------------------------------------------------------
         function onPrefilterModeChanged(app, modeValue)
             isCustom = strcmp(modeValue, 'Custom L(z)');
-            app.PrefilterExpressionField.Enable = matlab.lang.OnOffSwitchState(isCustom);
+            if isCustom
+                app.PrefilterExpressionField.Enable = 'on';
+            else
+                app.PrefilterExpressionField.Enable = 'off';
+            end
             app.PrefilterStatusLabel.Text = '';
             if ~isCustom
                 app.Prefilter = [];
