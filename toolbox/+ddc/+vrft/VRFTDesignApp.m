@@ -84,6 +84,8 @@ classdef VRFTDesignApp < handle
         % Basis tab widgets
         BasisPresetDropdown
         BasisTable
+        BasisAddButton
+        BasisRemoveButton
         BasisStatusLabel
 
         % Prefilter tab widgets
@@ -297,8 +299,8 @@ classdef VRFTDesignApp < handle
 
         function buildBasisTab(app, tabGroup)
             tab = uitab(tabGroup, 'Title', '3. Controller Structure');
-            grid = uigridlayout(tab, [3 1]);
-            grid.RowHeight = {'fit', '1x', 'fit'};
+            grid = uigridlayout(tab, [4 1]);
+            grid.RowHeight = {'fit', '1x', 'fit', 'fit'};
 
             topGrid = uigridlayout(grid, [1 3]);
             topGrid.ColumnWidth = {'fit', 'fit', 'fit'};
@@ -315,6 +317,14 @@ classdef VRFTDesignApp < handle
                 'Data', table((1:3)', {'1'; 'Ts/(z-1)'; '(z-1)/(Ts*z)'}, ...
                     'VariableNames', {'Index', 'Expression'}));
             app.BasisTable.Enable = 'off';
+
+            btnGrid = uigridlayout(grid, [1 2]);
+            btnGrid.ColumnWidth = {'fit', 'fit'};
+            btnGrid.Padding = [0 0 0 0];
+            app.BasisAddButton = uibutton(btnGrid, 'Text', '+ Add Row', ...
+                'ButtonPushedFcn', @(~, ~) app.onAddBasisRow(), 'Enable', 'off');
+            app.BasisRemoveButton = uibutton(btnGrid, 'Text', '- Remove Row', ...
+                'ButtonPushedFcn', @(~, ~) app.onRemoveBasisRow(), 'Enable', 'off');
 
             app.BasisStatusLabel = uilabel(grid, 'Text', '', 'FontColor', app.Theme.error);
         end
@@ -576,6 +586,30 @@ classdef VRFTDesignApp < handle
                 app.BasisTable.Enable = 'off';
             end
             app.BasisTable.ColumnEditable = [false, isCustom];
+            if isCustom
+                app.BasisAddButton.Enable = 'on';
+                app.BasisRemoveButton.Enable = 'on';
+            else
+                app.BasisAddButton.Enable = 'off';
+                app.BasisRemoveButton.Enable = 'off';
+            end
+        end
+
+        function onAddBasisRow(app)
+            data = app.BasisTable.Data;
+            n = height(data) + 1;
+            data(n, :) = {n, {'1'}};
+            app.BasisTable.Data = data;
+        end
+
+        function onRemoveBasisRow(app)
+            data = app.BasisTable.Data;
+            if height(data) <= 1
+                return;
+            end
+            data(end, :) = [];
+            data{:, 'Index'} = (1:height(data))';
+            app.BasisTable.Data = data;
         end
 
         function onApplyBasisPressed(app)
