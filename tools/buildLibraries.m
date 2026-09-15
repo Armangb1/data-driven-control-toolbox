@@ -17,9 +17,14 @@ function buildLibraries()
     end
 
     libName = 'ddc_lib';
+    tmpName = [libName '_tmp'];
     libFile = fullfile(libPath, [libName '.slx']);
+    tmpFile = fullfile(libPath, [tmpName '.slx']);
     if bdIsLoaded(libName)
         close_system(libName, 0);
+    end
+    if bdIsLoaded(tmpName)
+        close_system(tmpName, 0);
     end
     if exist(libFile, 'file')
         delete(libFile);
@@ -65,8 +70,13 @@ function buildLibraries()
     });
 
     Simulink.BlockDiagram.arrangeSystem(libName);
-    save_system(libName, libFile);
+    save_system(libName, tmpFile);
     close_system(libName, 0);
+
+    open_system(tmpFile);
+    save_system(tmpName, libFile, "ExportToVersion","R2022b");
+    close_system(tmpName, 0);
+    delete(tmpFile);
 
     fprintf('Built %s\n', libFile);
 end
