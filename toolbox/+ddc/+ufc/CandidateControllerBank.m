@@ -24,8 +24,13 @@ classdef CandidateControllerBank < matlab.System
     %   See also ddc.ufc.UnfalsifiedSwitchingController.
 
     properties (Nontunable)
-        Controllers = [0.5; 1; 2]  % tf array or numeric gain vector, one per candidate
-        SampleTime     (1,1) double = -1  % -1 = inherited
+        % Controllers Bank of candidate controllers (tf array or gain vector)
+        Controllers = [0.5; 1; 2]
+
+        % SampleTime Sample Time (-1 for inherited)
+        SampleTime (1,1) double = -1
+
+        % DiscretizationMethod Discretization method for continuous-time controllers
         DiscretizationMethod (1,1) string {mustBeMember(DiscretizationMethod, ...
             ["zoh","foh","tustin","matched","impulse"])} = "zoh"
     end
@@ -141,6 +146,33 @@ classdef CandidateControllerBank < matlab.System
 
         function n = candidateCount(obj)
             n = max(numel(obj.Controllers), 1);
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'Candidate Controller Bank', ...
+                'Text', [ ...
+                'Bank of candidate controllers for supervisory switching.' ...
+                newline ...
+                'Computes, at each step, the control signal each candidate ' ...
+                'controller would produce, for selection by an unfalsified ' ...
+                'switching controller.']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            mainSection = matlab.system.display.Section(...
+                'Title', 'Candidate Pool', ...
+                'PropertyList', {'Controllers'});
+
+            optionsSection = matlab.system.display.Section(...
+                'Title', 'Block Options', ...
+                'PropertyList', {'SampleTime', 'DiscretizationMethod'});
+
+            groups = matlab.system.display.SectionGroup(...
+                'Title', 'Main', ...
+                'Sections', [mainSection, optionsSection]);
         end
     end
 end

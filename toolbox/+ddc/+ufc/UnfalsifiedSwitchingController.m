@@ -32,19 +32,33 @@ classdef UnfalsifiedSwitchingController < matlab.System
     %   See also ddc.ufc.CandidateControllerBank, ddc.ufc.MultimodelSwitchingController.
 
     properties (Nontunable)
-        Controllers = [0.5; 1; 2]  % tf array or numeric gain vector, one per candidate
-        SampleTime     (1,1) double = -1  % -1 = inherited
+        % Controllers Bank of candidate controllers (tf array or gain vector)
+        Controllers = [0.5; 1; 2]
+
+        % SampleTime Sample Time (-1 for inherited)
+        SampleTime (1,1) double = -1
+
+        % DiscretizationMethod Discretization method for continuous-time controllers
         DiscretizationMethod (1,1) string {mustBeMember(DiscretizationMethod, ...
             ["zoh","foh","tustin","matched","impulse"])} = "zoh"
     end
 
     properties
+        % ForgettingFactor Exponential forgetting factor for cost accumulation
         ForgettingFactor (1,1) double {mustBeGreaterThan(ForgettingFactor,0), ...
                                         mustBeLessThanOrEqual(ForgettingFactor,1)} = 0.95
+
+        % HysteresisMargin Switching hysteresis margin
         HysteresisMargin (1,1) double {mustBeNonnegative} = 1e-3
-        Epsilon          (1,1) double {mustBePositive} = 1e-12
-        W1               (1,1) double {mustBeNonnegative} = 1  % weight of ehat in cost
-        W2               (1,1) double {mustBeNonnegative} = 1  % weight of uCand in cost
+
+        % Epsilon Regularization to avoid division by zero in the cost
+        Epsilon (1,1) double {mustBePositive} = 1e-12
+
+        % W1 Cost weight on the fictitious tracking error
+        W1 (1,1) double {mustBeNonnegative} = 1
+
+        % W2 Cost weight on the candidate control effort
+        W2 (1,1) double {mustBeNonnegative} = 1
     end
 
     properties (Access = private)
@@ -195,6 +209,47 @@ classdef UnfalsifiedSwitchingController < matlab.System
 
         function n = candidateCount(obj)
             n = max(numel(obj.Controllers), 1);
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'Unfalsified Switching Controller', ...
+                'Text', [ ...
+                'Unfalsified adaptive supervisory switching control for a ' ...
+                'bank of candidate controllers.' ...
+                newline ...
+                'Reconstructs fictitious tracking errors from the applied ' ...
+                'control and switches to the lowest-cost candidate subject ' ...
+                'to a hysteresis margin.']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            % --- Tab 1: Candidate setup ---
+            mainSection = matlab.system.display.Section(...
+                'Title', 'Candidate Pool', ...
+                'PropertyList', {'Controllers'});
+
+            optionsSection = matlab.system.display.Section(...
+                'Title', 'Block Options', ...
+                'PropertyList', {'SampleTime', 'DiscretizationMethod'});
+
+            mainGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Main', ...
+                'Sections', [mainSection, optionsSection]);
+
+            % --- Tab 2: Cost and switching ---
+            switchingSection = matlab.system.display.Section(...
+                'Title', 'Cost & Switching', ...
+                'PropertyList', {'ForgettingFactor', 'HysteresisMargin', ...
+                'Epsilon', 'W1', 'W2'});
+
+            switchingGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Switching', ...
+                'Sections', switchingSection);
+
+            groups = [mainGroup, switchingGroup];
         end
     end
 end

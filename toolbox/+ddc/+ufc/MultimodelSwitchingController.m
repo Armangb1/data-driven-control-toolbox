@@ -76,18 +76,30 @@ classdef MultimodelSwitchingController < matlab.System
     %   See also ddc.ufc.UnfalsifiedSwitchingController, ddc.ufc.CandidateControllerBank.
 
     properties (Nontunable)
-        Controllers = [0.5; 1; 2]  % tf array or numeric gain vector, one per candidate
-        Models      = [0.5; 1; 2]  % tf array or numeric gain vector, one per candidate
-        SampleTime     (1,1) double = -1  % -1 = inherited
+        % Controllers Bank of candidate controllers (tf array or gain vector)
+        Controllers = [0.5; 1; 2]
+
+        % Models Bank of candidate plant models (tf array or gain vector)
+        Models = [0.5; 1; 2]
+
+        % SampleTime Sample Time (-1 for inherited)
+        SampleTime (1,1) double = -1
+
+        % DiscretizationMethod Discretization method for continuous-time controllers and models
         DiscretizationMethod (1,1) string {mustBeMember(DiscretizationMethod, ...
             ["zoh","foh","tustin","matched","impulse"])} = "zoh"
     end
 
     properties
+        % ForgettingFactor Exponential forgetting factor for pair-cost accumulation
         ForgettingFactor (1,1) double {mustBeGreaterThan(ForgettingFactor,0), ...
                                         mustBeLessThanOrEqual(ForgettingFactor,1)} = 0.95
+
+        % HysteresisMargin Switching hysteresis margin
         HysteresisMargin (1,1) double {mustBeNonnegative} = 1e-3
-        Epsilon          (1,1) double {mustBePositive} = 1e-12
+
+        % Epsilon Regularization to avoid division by zero in the pair cost
+        Epsilon (1,1) double {mustBePositive} = 1e-12
     end
 
     properties (Access = private)
@@ -350,6 +362,47 @@ classdef MultimodelSwitchingController < matlab.System
 
         function n = candidateCount(obj)
             n = max(numel(obj.Controllers), 1);
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'Multimodel Switching Controller', ...
+                'Text', [ ...
+                'Multimodel unfalsified adaptive supervisory switching ' ...
+                'control (MMUASSC).' ...
+                newline ...
+                'Scores (controller, model) candidate pairs against the ' ...
+                'real signals and switches to the lowest-cost pair subject ' ...
+                'to a hysteresis margin.']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            % --- Tab 1: Candidate pair setup ---
+            mainSection = matlab.system.display.Section(...
+                'Title', 'Candidate Pairs', ...
+                'PropertyList', {'Controllers', 'Models'});
+
+            optionsSection = matlab.system.display.Section(...
+                'Title', 'Block Options', ...
+                'PropertyList', {'SampleTime', 'DiscretizationMethod'});
+
+            mainGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Main', ...
+                'Sections', [mainSection, optionsSection]);
+
+            % --- Tab 2: Cost and switching ---
+            switchingSection = matlab.system.display.Section(...
+                'Title', 'Cost & Switching', ...
+                'PropertyList', {'ForgettingFactor', 'HysteresisMargin', ...
+                'Epsilon'});
+
+            switchingGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Switching', ...
+                'Sections', switchingSection);
+
+            groups = [mainGroup, switchingGroup];
         end
     end
 end
