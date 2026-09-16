@@ -29,17 +29,19 @@ classdef RLSEstimator < matlab.System
     %   See also ddc.str.IndirectSTRController, ddc.mfac.MFACController.
 
     properties (Nontunable)
-        NumParameters    (1,1) double {mustBePositive, mustBeInteger} = 1
-        % ExternalReset Enable a scalar logical reset input that
-        %   re-initializes only the covariance matrix P before the current
-        %   RLS update, leaving Theta unchanged. Must be nontunable because
-        %   it changes the number of inputs.
-        ExternalReset    (1,1) logical = false
+        % NumParameters Number of parameters to estimate
+        NumParameters (1,1) double {mustBePositive, mustBeInteger} = 1
+
+        % ExternalReset Enable a scalar reset input that re-initializes the covariance matrix only
+        ExternalReset (1,1) logical = false
     end
 
     properties
+        % ForgettingFactor Exponential forgetting factor (1 = no forgetting)
         ForgettingFactor (1,1) double {mustBeGreaterThan(ForgettingFactor,0), ...
                                         mustBeLessThanOrEqual(ForgettingFactor,1)} = 1
+
+        % InitialCovarianceGain Initial covariance gain (P0 diagonal)
         InitialCovarianceGain (1,1) double {mustBePositive} = 1e4
     end
 
@@ -129,6 +131,26 @@ classdef RLSEstimator < matlab.System
 
         function num = getNumOutputsImpl(~)
             num = 2;
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'RLS Estimator', ...
+                'Text', [ ...
+                'Recursive Least Squares parameter estimator with ' ...
+                'optional exponential forgetting.' ...
+                newline ...
+                'Estimates theta online in the linear-in-parameters ' ...
+                'model y(k) = phi(k)''*theta + e(k).']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            groups = matlab.system.display.Section(...
+                'Title', 'RLS Estimator', ...
+                'PropertyList', {'NumParameters', 'ExternalReset', ...
+                'ForgettingFactor', 'InitialCovarianceGain'});
         end
     end
 end

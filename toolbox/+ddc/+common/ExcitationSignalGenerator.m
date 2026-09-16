@@ -14,9 +14,16 @@ classdef ExcitationSignalGenerator < matlab.System
     %   See also ddc.common.HankelBuilder, ddc.common.checkPersistencyExcitation.
 
     properties (Nontunable)
+        % SignalType Excitation signal type (PRBS or band-limited random)
         SignalType (1,:) char {mustBeMember(SignalType, {'prbs', 'random'})} = 'prbs'
+
+        % Amplitude Excitation signal amplitude
         Amplitude (1,1) double {mustBePositive} = 1
+
+        % Seed Random seed for reproducible signal generation
         Seed (1,1) double {mustBeInteger, mustBeNonnegative} = 0
+
+        % SwitchProbability PRBS switching probability per sample
         SwitchProbability (1,1) double {mustBeGreaterThan(SwitchProbability,0), ...
                                          mustBeLessThanOrEqual(SwitchProbability,1)} = 0.5
     end
@@ -77,6 +84,26 @@ classdef ExcitationSignalGenerator < matlab.System
 
         function num = getNumOutputsImpl(~)
             num = 1;
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'Excitation Signal Generator', ...
+                'Text', [ ...
+                'Persistency-of-excitation-rich signal source.' ...
+                newline ...
+                'Generates pseudo-random binary sequence (PRBS) or ' ...
+                'band-limited random excitation for offline data ' ...
+                'collection or excitation before adaptive control.']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            groups = matlab.system.display.Section(...
+                'Title', 'Excitation Signal Generator', ...
+                'PropertyList', {'SignalType', 'Amplitude', 'Seed', ...
+                'SwitchProbability'});
         end
     end
 end

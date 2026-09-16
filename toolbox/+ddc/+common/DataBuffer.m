@@ -15,8 +15,11 @@ classdef DataBuffer < matlab.System
     %   See also ddc.common.HankelBuilder, ddc.deepc.DeePCController.
 
     properties (Nontunable)
+        % WindowLength Buffer window length (number of samples stored)
         WindowLength (1,1) double {mustBePositive, mustBeInteger} = 10
-        SignalWidth  (1,1) double {mustBePositive, mustBeInteger} = 1
+
+        % SignalWidth Number of signals to buffer
+        SignalWidth (1,1) double {mustBePositive, mustBeInteger} = 1
     end
 
     properties (Access = private)
@@ -75,6 +78,25 @@ classdef DataBuffer < matlab.System
 
         function num = getNumOutputsImpl(~)
             num = 2;
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'Data Buffer', ...
+                'Text', [ ...
+                'Sliding-window FIFO buffer for online data-driven control.' ...
+                newline ...
+                'Retains the last WindowLength samples of one or more ' ...
+                'signals for online algorithms such as DeePC or RLS-based ' ...
+                'STR/MFAC estimators.']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            groups = matlab.system.display.Section(...
+                'Title', 'Data Buffer', ...
+                'PropertyList', {'WindowLength', 'SignalWidth'});
         end
     end
 end
