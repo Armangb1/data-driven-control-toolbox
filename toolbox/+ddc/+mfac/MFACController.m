@@ -48,18 +48,34 @@ classdef MFACController < matlab.System
     %   See also ddc.str.DirectSTRController, ddc.common.RLSEstimator.
 
     properties (Nontunable)
-        Ly  (1,1) double {mustBeInteger, mustBeNonnegative} = 0  % output pseudo-order
-        Lu  (1,1) double {mustBeInteger, mustBePositive}    = 1  % input pseudo-order
-        PhiInit = 1                                               % scalar or (Ly+Lu)-vector, initial PPD/PG
-        SampleTime     (1,1) double = -1  % -1 = inherited
+        % Ly Output pseudo-order (0 for CFDL/PFDL)
+        Ly (1,1) double {mustBeInteger, mustBeNonnegative} = 0
+
+        % Lu Input pseudo-order (1 for CFDL)
+        Lu (1,1) double {mustBeInteger, mustBePositive} = 1
+
+        % PhiInit Initial pseudo-partial-derivative (PPD/PG)
+        PhiInit = 1
+
+        % SampleTime Sample Time (-1 for inherited)
+        SampleTime (1,1) double = -1
     end
 
     properties
-        Eta     (1,1) double {mustBeReal}          = 1       % PPD step size
-        Mu      (1,1) double {mustBePositive}      = 1       % PPD weighting
-        Rho     = 1                                           % scalar or (Ly+Lu)-vector, control step size
-        Lambda  (1,1) double {mustBePositive}      = 1       % control weighting
-        Epsilon (1,1) double {mustBePositive}      = 1e-5    % reset threshold
+        % Eta PPD estimation step size
+        Eta (1,1) double {mustBeReal} = 1
+
+        % Mu PPD estimation weighting
+        Mu (1,1) double {mustBePositive} = 1
+
+        % Rho Control step size (scalar or length Ly+Lu)
+        Rho = 1
+
+        % Lambda Control weighting
+        Lambda (1,1) double {mustBePositive} = 1
+
+        % Epsilon Reset threshold for the PPD estimate
+        Epsilon (1,1) double {mustBePositive} = 1e-5
     end
 
     properties (Access = private)
@@ -215,6 +231,41 @@ classdef MFACController < matlab.System
                 sts = createSampleTime(obj, 'Type', 'Discrete', ...
                     'SampleTime', obj.SampleTime);
             end
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'MFAC Controller', ...
+                'Text', [ ...
+                'Model-Free Adaptive Control via dynamic linearization.' ...
+                newline ...
+                'Online pseudo-partial-derivative (PPD) estimation with ' ...
+                'projection and reset drives the model-free control law ' ...
+                '(CFDL, PFDL, or FFDL).']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            % --- Tab 1: Plant structure ---
+            mainSection = matlab.system.display.Section(...
+                'Title', 'Dynamic Linearization', ...
+                'PropertyList', {'Ly', 'Lu', 'PhiInit', 'SampleTime'});
+
+            mainGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Main', ...
+                'Sections', mainSection);
+
+            % --- Tab 2: Estimator and control gains ---
+            tuningSection = matlab.system.display.Section(...
+                'Title', 'Estimator and Control Gains', ...
+                'PropertyList', {'Eta', 'Mu', 'Rho', 'Lambda', 'Epsilon'});
+
+            tuningGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Tuning', ...
+                'Sections', tuningSection);
+
+            groups = [mainGroup, tuningGroup];
         end
     end
 end
