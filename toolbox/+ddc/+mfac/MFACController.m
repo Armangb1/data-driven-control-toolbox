@@ -51,6 +51,7 @@ classdef MFACController < matlab.System
         Ly  (1,1) double {mustBeInteger, mustBeNonnegative} = 0  % output pseudo-order
         Lu  (1,1) double {mustBeInteger, mustBePositive}    = 1  % input pseudo-order
         PhiInit = 1                                               % scalar or (Ly+Lu)-vector, initial PPD/PG
+        SampleTime     (1,1) double = -1  % -1 = inherited
     end
 
     properties
@@ -205,6 +206,15 @@ classdef MFACController < matlab.System
 
         function num = getNumOutputsImpl(~)
             num = 2;
+        end
+
+        function sts = getSampleTimeImpl(obj)
+            if obj.SampleTime == -1
+                sts = createSampleTime(obj, 'Type', 'Inherited');
+            else
+                sts = createSampleTime(obj, 'Type', 'Discrete', ...
+                    'SampleTime', obj.SampleTime);
+            end
         end
     end
 end

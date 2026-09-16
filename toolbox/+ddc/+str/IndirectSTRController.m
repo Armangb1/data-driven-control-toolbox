@@ -59,6 +59,7 @@ classdef IndirectSTRController < matlab.System
     properties (Nontunable)
         Na (1,1) double {mustBePositive, mustBeInteger} = 1  % order of A(q^-1) excluding leading 1
         Nb (1,1) double {mustBePositive, mustBeInteger} = 1  % order of B(q^-1) (b0 q^-1 + ... + b_{Nb-1} q^{-Nb})
+        SampleTime     (1,1) double = -1  % -1 = inherited
     end
 
     properties
@@ -280,6 +281,15 @@ classdef IndirectSTRController < matlab.System
         function [inputNames, outputNames] = getInputOutputNamesImpl(~)
             inputNames  = {'y', 'r'};
             outputNames = {'u', 'theta'};
+        end
+
+        function sts = getSampleTimeImpl(obj)
+            if obj.SampleTime == -1
+                sts = createSampleTime(obj, 'Type', 'Inherited');
+            else
+                sts = createSampleTime(obj, 'Type', 'Discrete', ...
+                    'SampleTime', obj.SampleTime);
+            end
         end
     end
 

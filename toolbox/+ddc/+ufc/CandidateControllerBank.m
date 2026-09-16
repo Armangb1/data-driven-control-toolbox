@@ -25,7 +25,7 @@ classdef CandidateControllerBank < matlab.System
 
     properties (Nontunable)
         Controllers = [0.5; 1; 2]  % tf array or numeric gain vector, one per candidate
-        SampleTime     (1,1) double {mustBePositive} = 1
+        SampleTime     (1,1) double = -1  % -1 = inherited
         DiscretizationMethod (1,1) string {mustBeMember(DiscretizationMethod, ...
             ["zoh","foh","tustin","matched","impulse"])} = "zoh"
     end
@@ -53,8 +53,11 @@ classdef CandidateControllerBank < matlab.System
             obj.MaxN_ = 0;
             for i = 1:n
                 C = obj.Controllers(i);
-                if C.Ts == 0
+                if C.Ts == 0 && obj.SampleTime > 0
                     C = c2d(C, obj.SampleTime, char(obj.DiscretizationMethod));
+                elseif C.Ts == 0 && obj.SampleTime < 0
+                    error('ddc:ufc:CandidateControllerBank:InheritedTsContinuousControllers', ...
+                        'SampleTime must be positive when Controllers contains continuous-time systems.');
                 end
                 [b, a] = tfdata(C, 'v');
                 obj.BCoeffs_{i} = b(:)';
@@ -114,8 +117,12 @@ classdef CandidateControllerBank < matlab.System
 
     methods (Access = protected)
         function sts = getSampleTimeImpl(obj)
-            sts = createSampleTime(obj, 'Type', 'Discrete', ...
-                'SampleTime', obj.SampleTime);
+            if obj.SampleTime == -1
+                sts = createSampleTime(obj, 'Type', 'Inherited');
+            else
+                sts = createSampleTime(obj, 'Type', 'Discrete', ...
+                    'SampleTime', obj.SampleTime);
+            end
         end
     end
 

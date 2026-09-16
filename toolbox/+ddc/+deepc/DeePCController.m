@@ -36,6 +36,7 @@ classdef DeePCController < matlab.System
         Tini  (1,1) double {mustBePositive, mustBeInteger} = 4
         N     (1,1) double {mustBePositive, mustBeInteger} = 10
         AssumedOrder (1,1) double {mustBeNonnegative} = 0
+        SampleTime     (1,1) double = -1  % -1 = inherited
     end
 
     properties (Dependent)
@@ -194,6 +195,15 @@ classdef DeePCController < matlab.System
 
         function num = getNumOutputsImpl(~)
             num = 2;
+        end
+
+        function sts = getSampleTimeImpl(obj)
+            if obj.SampleTime == -1
+                sts = createSampleTime(obj, 'Type', 'Inherited');
+            else
+                sts = createSampleTime(obj, 'Type', 'Discrete', ...
+                    'SampleTime', obj.SampleTime);
+            end
         end
     end
 end

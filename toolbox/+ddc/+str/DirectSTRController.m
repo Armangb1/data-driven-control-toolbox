@@ -27,6 +27,10 @@ classdef DirectSTRController < matlab.System
     %
     %   See also ddc.str.IndirectSTRController, ddc.common.RLSEstimator.
 
+    properties (Nontunable)
+        SampleTime (1,1) double = -1  % -1 = inherited
+    end
+
     properties
         Ac1 (1,1) double {mustBeReal, mustBeGreaterThan(Ac1,-1), ...
                            mustBeLessThan(Ac1,1)} = -0.5  % desired closed-loop pole coeff
@@ -115,6 +119,15 @@ classdef DirectSTRController < matlab.System
 
         function num = getNumOutputsImpl(~)
             num = 2;
+        end
+
+        function sts = getSampleTimeImpl(obj)
+            if obj.SampleTime == -1
+                sts = createSampleTime(obj, 'Type', 'Inherited');
+            else
+                sts = createSampleTime(obj, 'Type', 'Discrete', ...
+                    'SampleTime', obj.SampleTime);
+            end
         end
     end
 end
