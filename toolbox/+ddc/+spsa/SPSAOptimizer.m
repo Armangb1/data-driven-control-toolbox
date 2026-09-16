@@ -41,18 +41,34 @@ classdef SPSAOptimizer < matlab.System
     %       end
 
     properties (Nontunable)
+        % NumParameters Number of parameters
         NumParameters (1,1) double {mustBePositive, mustBeInteger} = 1
+
+        % InitialTheta Initial parameter estimate
         InitialTheta (:,1) double = 0
+
+        % ParameterUpdateMode Parameter update mode
         ParameterUpdateMode (1,1) string {mustBeMember(ParameterUpdateMode, ["immediate","deferred"])} = "immediate"
-        SampleTime     (1,1) double = -1  % -1 = inherited
+
+        % SampleTime Sample Time (-1 for inherited)
+        SampleTime (1,1) double = -1
     end
 
     properties
-        ATuning (1,1) double {mustBePositive} = 0.1    % numerator of a_k
-        CTuning (1,1) double {mustBePositive} = 0.1    % numerator of c_k
-        ACommon (1,1) double {mustBeNonnegative} = 10  % stability constant Abar
-        Alpha   (1,1) double {mustBePositive} = 0.602  % standard SPSA exponent
-        Gamma   (1,1) double {mustBePositive} = 0.101  % standard SPSA exponent
+        % ATuning Numerator of a_k (step-size gain)
+        ATuning (1,1) double {mustBePositive} = 0.1
+
+        % CTuning Numerator of c_k (perturbation size)
+        CTuning (1,1) double {mustBePositive} = 0.1
+
+        % ACommon Stability constant Abar
+        ACommon (1,1) double {mustBeNonnegative} = 10
+
+        % Alpha Decay exponent for a_k
+        Alpha (1,1) double {mustBePositive} = 0.602
+
+        % Gamma Decay exponent for c_k
+        Gamma (1,1) double {mustBePositive} = 0.101
     end
 
     properties (Access = private)
@@ -187,6 +203,42 @@ classdef SPSAOptimizer < matlab.System
                 sts = createSampleTime(obj, 'Type', 'Discrete', ...
                     'SampleTime', obj.SampleTime);
             end
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'SPSA Optimizer', ...
+                'Text', [ ...
+                'Simultaneous Perturbation Stochastic Approximation.' ...
+                newline ...
+                'Online, gradient-free optimizer that tunes a parameter ' ...
+                'vector from noisy scalar loss measurements only.']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            % --- Tab 1: Main setup ---
+            mainSection = matlab.system.display.Section(...
+                'Title', 'SPSAOptimizer', ...
+                'PropertyList', {'NumParameters', 'InitialTheta', ...
+                'ParameterUpdateMode', 'SampleTime'});
+
+            mainGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Main', ...
+                'Sections', mainSection);
+
+            % --- Tab 2: Tuning gains ---
+            tuningSection = matlab.system.display.Section(...
+                'Title', 'Gain Sequences', ...
+                'PropertyList', {'ATuning', 'CTuning', 'ACommon', ...
+                'Alpha', 'Gamma'});
+
+            tuningGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Tuning Gains', ...
+                'Sections', tuningSection);
+
+            groups = [mainGroup, tuningGroup];
         end
     end
 end
