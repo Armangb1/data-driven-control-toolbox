@@ -28,17 +28,27 @@ classdef DirectSTRController < matlab.System
     %   See also ddc.str.IndirectSTRController, ddc.common.RLSEstimator.
 
     properties (Nontunable)
-        SampleTime (1,1) double = -1  % -1 = inherited
+        % SampleTime Sample Time (-1 for inherited)
+        SampleTime (1,1) double = -1
     end
 
     properties
+        % Ac1 Desired closed-loop pole coefficient Ac1
         Ac1 (1,1) double {mustBeReal, mustBeGreaterThan(Ac1,-1), ...
-                           mustBeLessThan(Ac1,1)} = -0.5  % desired closed-loop pole coeff
+                           mustBeLessThan(Ac1,1)} = -0.5
+
+        % ForgettingFactor RLS exponential forgetting factor
         ForgettingFactor (1,1) double {mustBeGreaterThan(ForgettingFactor,0), ...
                                         mustBeLessThanOrEqual(ForgettingFactor,1)} = 0.98
-        MinBeta0 (1,1) double {mustBePositive} = 1e-3  % guard against near-zero beta0 estimate
-        InitialS0 (1,1) double {mustBeReal} = 0  % initial controller gain (avoids u==0 deadlock)
-        InitialT0 (1,1) double {mustBeReal} = 1  % initial feedforward gain (avoids u==0 deadlock)
+
+        % MinBeta0 Guard threshold for near-zero beta0 estimates
+        MinBeta0 (1,1) double {mustBePositive} = 1e-3
+
+        % InitialS0 Initial controller gain S0 (avoids u==0 deadlock)
+        InitialS0 (1,1) double {mustBeReal} = 0
+
+        % InitialT0 Initial feedforward gain T0 (avoids u==0 deadlock)
+        InitialT0 (1,1) double {mustBeReal} = 1
     end
 
     properties (Access = private)
@@ -128,6 +138,26 @@ classdef DirectSTRController < matlab.System
                 sts = createSampleTime(obj, 'Type', 'Discrete', ...
                     'SampleTime', obj.SampleTime);
             end
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'Direct STR Controller', ...
+                'Text', [ ...
+                'Direct self-tuning regulator with RST pole placement for ' ...
+                'first-order ARX plants.' ...
+                newline ...
+                'Controller gains are estimated directly from data via ' ...
+                'RLS and applied through the RST control law.']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            groups = matlab.system.display.Section(...
+                'Title', 'DirectSTRController', ...
+                'PropertyList', {'SampleTime', 'Ac1', 'ForgettingFactor', ...
+                'MinBeta0', 'InitialS0', 'InitialT0'});
         end
     end
 end

@@ -57,18 +57,32 @@ classdef IndirectSTRController < matlab.System
     %            ddc.str.mdpp.mdpp_design.
 
     properties (Nontunable)
-        Na (1,1) double {mustBePositive, mustBeInteger} = 1  % order of A(q^-1) excluding leading 1
-        Nb (1,1) double {mustBePositive, mustBeInteger} = 1  % order of B(q^-1) (b0 q^-1 + ... + b_{Nb-1} q^{-Nb})
-        SampleTime     (1,1) double = -1  % -1 = inherited
+        % Na Order of A(q^-1) excluding the leading 1
+        Na (1,1) double {mustBePositive, mustBeInteger} = 1
+
+        % Nb Order of B(q^-1)
+        Nb (1,1) double {mustBePositive, mustBeInteger} = 1
+
+        % SampleTime Sample Time (-1 for inherited)
+        SampleTime (1,1) double = -1
     end
 
     properties
-        Am (1,:) double {mustBeFinite} = [1 -0.5]  % desired closed-loop characteristic polynomial
-        Bm (1,:) double {mustBeFinite} = [0.5]     % desired reference model numerator
-        ObserverPole (1,1) double {mustBeFinite} = 0  % observer pole location (0 = deadbeat)
+        % Am Desired closed-loop characteristic polynomial
+        Am (1,:) double {mustBeFinite} = [1 -0.5]
+
+        % Bm Desired reference-model numerator
+        Bm (1,:) double {mustBeFinite} = [0.5]
+
+        % ObserverPole Observer pole location (0 = deadbeat)
+        ObserverPole (1,1) double {mustBeFinite} = 0
+
+        % ForgettingFactor RLS exponential forgetting factor
         ForgettingFactor (1,1) double {mustBeGreaterThan(ForgettingFactor,0), ...
                                         mustBeLessThanOrEqual(ForgettingFactor,1)} = 0.98
-        MinB (1,1) double {mustBePositive} = 1e-3  % guard against near-zero B estimate
+
+        % MinB Guard threshold for near-zero B estimates
+        MinB (1,1) double {mustBePositive} = 1e-3
     end
 
     properties (Access = private)
@@ -319,6 +333,43 @@ classdef IndirectSTRController < matlab.System
         function Bhat = getEstimatedB(obj)
         %getEstimatedB  Latest estimated plant B polynomial.
             Bhat = obj.Bhat_;
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'Indirect STR Controller', ...
+                'Text', [ ...
+                'Indirect self-tuning regulator with online ARX ' ...
+                'identification and minimum-degree pole placement.' ...
+                newline ...
+                'RLS estimates the plant model and re-designs the RST ' ...
+                'controller each sample via MDPP to meet the desired ' ...
+                'closed-loop response.']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            % --- Tab 1: Main setup ---
+            mainSection = matlab.system.display.Section(...
+                'Title', 'Model & Design', ...
+                'PropertyList', {'Na', 'Nb', 'Am', 'Bm', 'ObserverPole', ...
+                'SampleTime'});
+
+            mainGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Main', ...
+                'Sections', mainSection);
+
+            % --- Tab 2: Adaptation ---
+            tuningSection = matlab.system.display.Section(...
+                'Title', 'Parameter Estimation', ...
+                'PropertyList', {'ForgettingFactor', 'MinB'});
+
+            tuningGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Adaptation', ...
+                'Sections', tuningSection);
+
+            groups = [mainGroup, tuningGroup];
         end
     end
 end
