@@ -31,12 +31,23 @@ classdef DeePCController < matlab.System
     %   See also ddc.deepc.deepcDesign, ddc.common.HankelBuilder.
 
     properties (Nontunable)
-        DataU (:,:) double = []   % m-by-T offline input data
-        DataY (:,:) double = []   % p-by-T offline output data
-        Tini  (1,1) double {mustBePositive, mustBeInteger} = 4
-        N     (1,1) double {mustBePositive, mustBeInteger} = 10
+        % DataU m-by-T offline input data (persistently exciting)
+        DataU (:,:) double = []
+
+        % DataY p-by-T offline output data
+        DataY (:,:) double = []
+
+        % Tini Initial trajectory length (included variables)
+        Tini (1,1) double {mustBePositive, mustBeInteger} = 4
+
+        % N Prediction horizon
+        N (1,1) double {mustBePositive, mustBeInteger} = 10
+
+        % AssumedOrder Assumed system order (used for output rank check)
         AssumedOrder (1,1) double {mustBeNonnegative} = 0
-        SampleTime     (1,1) double = -1  % -1 = inherited
+
+        % SampleTime Sample Time (-1 for inherited)
+        SampleTime (1,1) double = -1
     end
 
     properties (Dependent)
@@ -45,10 +56,17 @@ classdef DeePCController < matlab.System
     end
 
     properties
-        Q (1,1) double {mustBeNonnegative} = 1      % output tracking weight
-        R (1,1) double {mustBeNonnegative} = 0.01   % input effort weight
-        LambdaG (1,1) double {mustBeNonnegative} = 1    % g-regularization
-        LambdaY (1,1) double {mustBeNonnegative} = 1e4  % slack regularization
+        % Q Weight on future output tracking error
+        Q (1,1) double {mustBeNonnegative} = 1
+
+        % R Weight on future input effort
+        R (1,1) double {mustBeNonnegative} = 0.01
+
+        % LambdaG g-regularization weight
+        LambdaG (1,1) double {mustBeNonnegative} = 1
+
+        % LambdaY Slack-regularization weight on sigma
+        LambdaY (1,1) double {mustBeNonnegative} = 1e4
     end
 
     properties (Access = private)
@@ -204,6 +222,42 @@ classdef DeePCController < matlab.System
                 sts = createSampleTime(obj, 'Type', 'Discrete', ...
                     'SampleTime', obj.SampleTime);
             end
+        end
+    end
+
+    methods (Static, Access = protected)
+        function header = getHeaderImpl
+            header = matlab.system.display.Header(mfilename('class'), ...
+                'Title', 'DeePC Controller', ...
+                'Text', [ ...
+                'Data-Enabled Predictive Control (DeePC).' ...
+                newline ...
+                'Solves the regularized DeePC receding-horizon problem at ' ...
+                'each step and applies the first input of the optimal ' ...
+                'input trajectory.']);
+        end
+
+        function groups = getPropertyGroupsImpl
+            % --- Tab 1: Data and horizon setup ---
+            mainSection = matlab.system.display.Section(...
+                'Title', 'DeePCController', ...
+                'PropertyList', {'DataU', 'DataY', 'Tini', 'N', ...
+                'AssumedOrder', 'SampleTime'});
+
+            mainGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Main', ...
+                'Sections', mainSection);
+
+            % --- Tab 2: Cost function weights ---
+            costSection = matlab.system.display.Section(...
+                'Title', 'Cost Function Weights', ...
+                'PropertyList', {'Q', 'R', 'LambdaG', 'LambdaY'});
+
+            costGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Cost Weights', ...
+                'Sections', costSection);
+
+            groups = [mainGroup, costGroup];
         end
     end
 end
