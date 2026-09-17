@@ -69,6 +69,12 @@ classdef SPSAOptimizer < matlab.System
 
         % Gamma Decay exponent for c_k
         Gamma (1,1) double {mustBePositive} = 0.101
+
+        % GradientClipLower Lower bound for the clipped gradient estimate
+        GradientClipLower (1,1) double = -inf
+
+        % GradientClipUpper Upper bound for the clipped gradient estimate
+        GradientClipUpper (1,1) double = inf
     end
 
     properties (Access = private)
@@ -87,7 +93,20 @@ classdef SPSAOptimizer < matlab.System
         end
     end
 
+    methods (Access = private)
+        function g = clipGradient(obj, g)
+            g = min(max(g, obj.GradientClipLower), obj.GradientClipUpper);
+        end
+    end
+
     methods (Access = protected)
+        function validatePropertiesImpl(obj)
+            if obj.GradientClipLower > obj.GradientClipUpper
+                error('ddc:spsa:GradientClipBounds', ...
+                    'GradientClipLower must be less than or equal to GradientClipUpper.');
+            end
+        end
+
         function setupImpl(obj)
             n = obj.NumParameters;
             if isscalar(obj.InitialTheta)
@@ -127,7 +146,7 @@ classdef SPSAOptimizer < matlab.System
                     case 1
                         if obj.HasStoredLoss_
                             ak = obj.ATuning / (obj.K_ + 1 + obj.ACommon)^obj.Alpha;
-                            ghat = (obj.LossPlus_ - lossMeasurement) ./ (2*obj.Ck_*obj.Delta_);
+                            ghat = obj.clipGradient((obj.LossPlus_ - lossMeasurement) ./ (2*obj.Ck_*obj.Delta_));
                             obj.Theta_ = obj.Theta_ - ak*ghat;
                             obj.K_ = obj.K_ + 1;
                         end
@@ -160,7 +179,7 @@ classdef SPSAOptimizer < matlab.System
                     otherwise
                         lossMinus = lossMeasurement;
                         ak = obj.ATuning / (obj.K_ + 1 + obj.ACommon)^obj.Alpha;
-                        ghat = (obj.LossPlus_ - lossMinus) ./ (2*obj.Ck_*obj.Delta_);
+                        ghat = obj.clipGradient((obj.LossPlus_ - lossMinus) ./ (2*obj.Ck_*obj.Delta_));
                         obj.Theta_ = obj.Theta_ - ak*ghat;
                         obj.K_ = obj.K_ + 1;
                         obj.Phase_ = 1;
@@ -238,7 +257,16 @@ classdef SPSAOptimizer < matlab.System
                 'Title', 'Tuning Gains', ...
                 'Sections', tuningSection);
 
-            groups = [mainGroup, tuningGroup];
+            % --- Tab 3: Gradient clipping ---
+            gradientSection = matlab.system.display.Section(...
+                'Title', 'Gradient Clipping', ...
+                'PropertyList', {'GradientClipLower', 'GradientClipUpper'});
+
+            gradientGroup = matlab.system.display.SectionGroup(...
+                'Title', 'Gradient Clipping', ...
+                'Sections', gradientSection);
+
+            groups = [mainGroup, tuningGroup, gradientGroup];
         end
     end
 end
