@@ -143,5 +143,40 @@ classdef tSPSAOptimizer < matlab.unittest.TestCase
                 'GradientClipLower', 1, 'GradientClipUpper', 0);
             testCase.verifyError(@() opt.step(0), 'ddc:spsa:GradientClipBounds');
         end
+
+        function testExternalResetRestartsIterationCounter(testCase)
+            CTuning = 0.5;
+            loss = @(th) (th-2).^2;
+
+            % No-reset reference: complete one full iteration (phases 1-2-3),
+            % so K_ = 1, then emit the next phase-1 perturbation.
+            rng(7);
+            optNr = ddc.spsa.SPSAOptimizer('NumParameters', 1, 'InitialTheta', 5, ...
+                'ATuning', 0.5, 'CTuning', CTuning, 'ACommon', 5);
+            p = 5; l = loss(p);
+            [p, ~] = optNr.step(l); l = loss(p);
+            [p, ~] = optNr.step(l); l = loss(p);
+            [p, ~] = optNr.step(l); l = loss(p);
+            thNr = p;
+            [pNr, ~] = optNr.step(l);
+            pertNr = abs(pNr - thNr);
+
+            % Reset-enabled run with reset asserted on the fourth call.
+            rng(7);
+            optR = ddc.spsa.SPSAOptimizer('NumParameters', 1, 'InitialTheta', 5, ...
+                'ATuning', 0.5, 'CTuning', CTuning, 'ACommon', 5, 'ExternalReset', true);
+            p = 5; l = loss(p);
+            [p, ~] = optR.step(l, false); l = loss(p);
+            [p, ~] = optR.step(l, false); l = loss(p);
+            [p, ~] = optR.step(l, false); l = loss(p);
+            thR = p;
+            [pR, ~] = optR.step(l, true);
+            pertR = abs(pR - thR);
+
+            testCase.verifyEqual(pertR, CTuning, 'AbsTol', 1e-9, ...
+                'After a reset, K_ must be 0 so the perturbation c_k equals CTuning');
+            testCase.verifyGreaterThan(pertR, pertNr, ...
+                'Resetting K_ must restore a larger perturbation than without reset');
+        end
     end
 end

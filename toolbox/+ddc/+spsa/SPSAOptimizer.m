@@ -33,11 +33,24 @@ classdef SPSAOptimizer < matlab.System
     %   block. Wire: ParamToApply -> (system under tuning) -> loss metric
     %   -> LossMeasurement input.
     %
+    %   When ExternalReset is true, the object accepts a second scalar
+    %   input, reset. A true reset re-initializes the iteration counter
+    %   K_ to zero, so the decaying gain sequences a_k and c_k restart
+    %   from their initial values. The parameter estimate Theta_ and the
+    %   cycle phase are left unchanged.
+    %
     %   Example (MATLAB):
     %       opt = ddc.spsa.SPSAOptimizer('NumParameters', 2, ...
     %           'InitialTheta', [1;1]);
     %       for k = 1:300
     %           [paramToApply, thetaHat] = opt.step(loss); % apply paramToApply, measure loss
+    %       end
+    %
+    %   Example (MATLAB) with external reset:
+    %       opt = ddc.spsa.SPSAOptimizer('NumParameters', 2, ...
+    %           'InitialTheta', [1;1], 'ExternalReset', true);
+    %       for k = 1:300
+    %           [paramToApply, thetaHat] = opt.step(loss, reset);
     %       end
 
     properties (Nontunable)
@@ -49,6 +62,9 @@ classdef SPSAOptimizer < matlab.System
 
         % ParameterUpdateMode Parameter update mode
         ParameterUpdateMode (1,1) string {mustBeMember(ParameterUpdateMode, ["immediate","deferred"])} = "immediate"
+
+        % ExternalReset Enable a scalar reset input that re-initializes the iteration counter K_
+        ExternalReset (1,1) logical = false
 
         % SampleTime Sample Time (-1 for inherited)
         SampleTime (1,1) double = -1
@@ -137,8 +153,14 @@ classdef SPSAOptimizer < matlab.System
             obj.HasStoredLoss_ = false;
         end
 
-        function [paramToApply, thetaEstimate] = stepImpl(obj, lossMeasurement)
+        function [paramToApply, thetaEstimate] = stepImpl(obj, varargin)
             n = obj.NumParameters;
+            lossMeasurement = varargin{1};
+
+            % External reset: re-initialize only the iteration counter K_.
+            if obj.ExternalReset && varargin{2}
+                obj.K_ = 0;
+            end
 
             if obj.ParameterUpdateMode == "deferred"
                 % ---- 2-phase deferred cycle ----
@@ -207,8 +229,19 @@ classdef SPSAOptimizer < matlab.System
             fz1 = true; fz2 = true;
         end
 
-        function num = getNumInputsImpl(~)
-            num = 1;
+        function num = getNumInputsImpl(obj)
+            if obj.ExternalReset
+                num = 2;
+            else
+                num = 1;
+            end
+        end
+
+        function varargout = getInputNamesImpl(obj)
+            varargout{1} = 'lossMeasurement';
+            if obj.ExternalReset
+                varargout{2} = 'reset';
+            end
         end
 
         function num = getNumOutputsImpl(~)
@@ -241,7 +274,7 @@ classdef SPSAOptimizer < matlab.System
             mainSection = matlab.system.display.Section(...
                 'Title', 'SPSAOptimizer', ...
                 'PropertyList', {'NumParameters', 'InitialTheta', ...
-                'ParameterUpdateMode', 'SampleTime'});
+                'ParameterUpdateMode', 'ExternalReset', 'SampleTime'});
 
             mainGroup = matlab.system.display.SectionGroup(...
                 'Title', 'Main', ...
