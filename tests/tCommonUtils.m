@@ -67,6 +67,23 @@ classdef tCommonUtils < matlab.unittest.TestCase
             testCase.verifyEqual(theta, trueTheta, 'AbsTol', 1e-3);
         end
 
+        function testRLSEstimatorInitialThetaAndReset(testCase)
+            theta0 = [2; -1];
+            est = ddc.common.RLSEstimator('NumParameters', 2, ...
+                'InitialTheta', theta0);
+
+            % A zero regressor leaves the initial estimate unchanged.
+            [theta, predictionError] = est.step([0; 0], 3);
+            testCase.verifyEqual(theta, theta0);
+            testCase.verifyEqual(predictionError, 3);
+
+            est.step([1; 0], 5);
+            reset(est);
+            [theta, predictionError] = est.step([0; 0], 3);
+            testCase.verifyEqual(theta, theta0);
+            testCase.verifyEqual(predictionError, 3);
+        end
+
         function testRLSEstimatorExternalResetEquivalent(testCase)
             % With the reset input held false, the 3-input form must be
             % identical to the default 2-input RLS.

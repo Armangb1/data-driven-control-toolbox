@@ -15,6 +15,8 @@ classdef RLSEstimator < matlab.System
     %   leaving Theta unchanged, and then performs the normal RLS update on
     %   the current phi,y sample with the re-initialized covariance.
     %   This differs from resetImpl(), which resets both Theta and P.
+    %   InitialTheta specifies the estimate used by setupImpl() and
+    %   resetImpl(); an empty value defaults to zeros(NumParameters,1).
     %
     %   Example (MATLAB):
     %       est = ddc.common.RLSEstimator('NumParameters', 3, ...
@@ -43,6 +45,9 @@ classdef RLSEstimator < matlab.System
 
         % InitialCovarianceGain Initial covariance gain (P0 diagonal)
         InitialCovarianceGain (1,1) double {mustBePositive} = 1e4
+
+        % InitialTheta Initial parameter estimate (empty defaults to zero)
+        InitialTheta (:,1) double {mustBeReal, mustBeFinite} = zeros(0,1)
     end
 
     properties (Access = private)
@@ -59,14 +64,25 @@ classdef RLSEstimator < matlab.System
     methods (Access = protected)
         function setupImpl(obj)
             n = obj.NumParameters;
-            obj.Theta = zeros(n, 1);
+            obj.Theta = obj.getInitialTheta();
             obj.P = obj.InitialCovarianceGain * eye(n);
         end
 
         function resetImpl(obj)
             n = obj.NumParameters;
-            obj.Theta = zeros(n, 1);
+            obj.Theta = obj.getInitialTheta();
             obj.P = obj.InitialCovarianceGain * eye(n);
+        end
+
+        function theta0 = getInitialTheta(obj)
+            theta0 = obj.InitialTheta;
+            if isempty(theta0)
+                theta0 = zeros(obj.NumParameters, 1);
+            elseif numel(theta0) ~= obj.NumParameters
+                error('ddc:RLSEstimator:InitialThetaSize', ...
+                    'InitialTheta must contain NumParameters elements.');
+            end
+            theta0 = theta0(:);
         end
 
         function [theta, predictionError] = stepImpl(obj, varargin)
@@ -150,7 +166,7 @@ classdef RLSEstimator < matlab.System
             groups = matlab.system.display.Section(...
                 'Title', 'RLS Estimator', ...
                 'PropertyList', {'NumParameters', 'ExternalReset', ...
-                'ForgettingFactor', 'InitialCovarianceGain'});
+                'ForgettingFactor', 'InitialCovarianceGain', 'InitialTheta'});
         end
     end
 end
