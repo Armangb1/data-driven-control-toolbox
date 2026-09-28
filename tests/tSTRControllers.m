@@ -51,6 +51,34 @@ classdef tSTRControllers < matlab.unittest.TestCase
             testCase.verifyNotEqual(u1, 0);
         end
 
+        function testDirectSTRInitialTheta(testCase)
+            theta0 = [0.5; 0.3];
+            ctrl = ddc.str.DirectSTRController('InitialTheta', theta0);
+            [~, theta] = ctrl.step(0, 1);
+            testCase.verifyEqual(theta, theta0);
+        end
+
+        function testIndirectSTRInitialTheta(testCase)
+            theta0 = [0.8; 0.5];
+            ctrl = ddc.str.IndirectSTRController( ...
+                'Na', 1, 'Nb', 1, 'InitialTheta', theta0);
+            [~, theta] = ctrl.step(0, 1);
+            testCase.verifyEqual(theta, theta0);
+            testCase.verifyEqual(ctrl.getEstimatedA(), [1 -0.8]);
+            testCase.verifyEqual(ctrl.getEstimatedB(), 0.5);
+        end
+
+        function testSTRInitialThetaSizeValidation(testCase)
+            direct = ddc.str.DirectSTRController('InitialTheta', 0.5);
+            testCase.verifyError(@() direct.step(0, 1), ...
+                'ddc:RLSEstimator:InitialThetaSize');
+
+            indirect = ddc.str.IndirectSTRController( ...
+                'Na', 2, 'Nb', 1, 'InitialTheta', [0.8; 0.5]);
+            testCase.verifyError(@() indirect.step(0, 1), ...
+                'ddc:IndirectSTRController:InitialThetaSize');
+        end
+
         function testSecondOrderARXPlant(testCase)
             % Second-order ARX (same-sample convention):
             %   y(k) = 1.1*y(k-1) - 0.3*y(k-2) + u(k) + 0.5*u(k-1)

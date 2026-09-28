@@ -83,6 +83,9 @@ classdef IndirectSTRController < matlab.System
 
         % MinB Guard threshold for near-zero B estimates
         MinB (1,1) double {mustBePositive} = 1e-3
+
+        % InitialTheta Initial ARX estimate [-a1;...;-aNa;b0;...]
+        InitialTheta (:,1) double {mustBeReal, mustBeFinite} = zeros(0,1)
     end
 
     properties (Access = private)
@@ -108,15 +111,17 @@ classdef IndirectSTRController < matlab.System
     methods (Access = protected)
         function setupImpl(obj)
             nTheta = obj.Na + obj.Nb;
+            theta0 = obj.getInitialTheta();
             obj.RLS_ = ddc.common.RLSEstimator('NumParameters', nTheta, ...
-                'ForgettingFactor', obj.ForgettingFactor);
+                'ForgettingFactor', obj.ForgettingFactor, ...
+                'InitialTheta', theta0);
 
             obj.R_ = [1];
             obj.S_ = [0];
             obj.T_ = [1];
             obj.Ahat_ = [1];
             obj.Bhat_ = [1];
-            obj.Theta_ = zeros(nTheta, 1);
+            obj.Theta_ = theta0;
             obj.YHistory_ = zeros(obj.Na, 1);
             obj.UHistory_ = zeros(max(obj.Nb, obj.Na - 1), 1);
             obj.RHistory_ = zeros(max(obj.Na - 1, 0), 1);
@@ -125,13 +130,12 @@ classdef IndirectSTRController < matlab.System
 
         function resetImpl(obj)
             reset(obj.RLS_);
-            nTheta = obj.Na + obj.Nb;
             obj.R_ = [1];
             obj.S_ = [0];
             obj.T_ = [1];
             obj.Ahat_ = [1];
             obj.Bhat_ = [1];
-            obj.Theta_ = zeros(nTheta, 1);
+            obj.Theta_ = obj.getInitialTheta();
             obj.YHistory_ = zeros(obj.Na, 1);
             obj.UHistory_ = zeros(max(obj.Nb, obj.Na - 1), 1);
             obj.RHistory_ = zeros(max(obj.Na - 1, 0), 1);
@@ -164,6 +168,17 @@ classdef IndirectSTRController < matlab.System
         end
 
         % ---- Private helpers ----
+
+        function theta0 = getInitialTheta(obj)
+            theta0 = obj.InitialTheta;
+            if isempty(theta0)
+                theta0 = zeros(obj.Na + obj.Nb, 1);
+            elseif numel(theta0) ~= obj.Na + obj.Nb
+                error('ddc:IndirectSTRController:InitialThetaSize', ...
+                    'InitialTheta must contain Na + Nb elements.');
+            end
+            theta0 = theta0(:);
+        end
 
         function phi = buildRegressor(obj)
         %buildRegressor  Construct the ARX regressor vector.
@@ -363,7 +378,7 @@ classdef IndirectSTRController < matlab.System
             % --- Tab 2: Adaptation ---
             tuningSection = matlab.system.display.Section(...
                 'Title', 'Parameter Estimation', ...
-                'PropertyList', {'ForgettingFactor', 'MinB'});
+                'PropertyList', {'ForgettingFactor', 'MinB', 'InitialTheta'});
 
             tuningGroup = matlab.system.display.SectionGroup(...
                 'Title', 'Adaptation', ...

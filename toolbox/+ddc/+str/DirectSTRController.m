@@ -49,6 +49,9 @@ classdef DirectSTRController < matlab.System
 
         % InitialT0 Initial feedforward gain T0 (avoids u==0 deadlock)
         InitialT0 (1,1) double {mustBeReal} = 1
+
+        % InitialTheta Initial RLS estimate [beta0; beta1]
+        InitialTheta (:,1) double {mustBeReal, mustBeFinite} = zeros(2,1)
     end
 
     properties (Access = private)
@@ -68,7 +71,8 @@ classdef DirectSTRController < matlab.System
     methods (Access = protected)
         function setupImpl(obj)
             obj.RLS_ = ddc.common.RLSEstimator('NumParameters', 2, ...
-                'ForgettingFactor', obj.ForgettingFactor);
+                'ForgettingFactor', obj.ForgettingFactor, ...
+                'InitialTheta', obj.InitialTheta);
             obj.PrevY_ = 0;
             obj.PrevU_ = 0;
             obj.S0_ = obj.InitialS0;
@@ -157,7 +161,7 @@ classdef DirectSTRController < matlab.System
             groups = matlab.system.display.Section(...
                 'Title', 'DirectSTRController', ...
                 'PropertyList', {'SampleTime', 'Ac1', 'ForgettingFactor', ...
-                'MinBeta0', 'InitialS0', 'InitialT0'});
+                'MinBeta0', 'InitialS0', 'InitialT0', 'InitialTheta'});
         end
     end
 end
