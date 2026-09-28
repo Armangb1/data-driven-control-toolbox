@@ -58,6 +58,14 @@ classdef tSTRControllers < matlab.unittest.TestCase
             testCase.verifyEqual(theta, theta0);
         end
 
+        function testDirectSTRInitialCovarianceGain(testCase)
+            ctrl = ddc.str.DirectSTRController( ...
+                'ForgettingFactor', 1, 'InitialCovarianceGain', 4);
+            ctrl.step(0, 1);
+            [~, theta] = ctrl.step(1, 1);
+            testCase.verifyEqual(theta, [0.8; 0], 'AbsTol', 1e-12);
+        end
+
         function testIndirectSTRInitialTheta(testCase)
             theta0 = [0.8; 0.5];
             ctrl = ddc.str.IndirectSTRController( ...
@@ -66,6 +74,15 @@ classdef tSTRControllers < matlab.unittest.TestCase
             testCase.verifyEqual(theta, theta0);
             testCase.verifyEqual(ctrl.getEstimatedA(), [1 -0.8]);
             testCase.verifyEqual(ctrl.getEstimatedB(), 0.5);
+        end
+
+        function testIndirectSTRInitialCovarianceGain(testCase)
+            ctrl = ddc.str.IndirectSTRController( ...
+                'Na', 1, 'Nb', 1, 'ForgettingFactor', 1, ...
+                'InitialCovarianceGain', 4);
+            ctrl.step(0, 1);
+            [~, theta] = ctrl.step(1, 1);
+            testCase.verifyEqual(theta, [0; 0.8], 'AbsTol', 1e-12);
         end
 
         function testSTRInitialThetaSizeValidation(testCase)

@@ -41,6 +41,9 @@ classdef DirectSTRController < matlab.System
         ForgettingFactor (1,1) double {mustBeGreaterThan(ForgettingFactor,0), ...
                                         mustBeLessThanOrEqual(ForgettingFactor,1)} = 0.98
 
+        % InitialCovarianceGain Initial RLS covariance diagonal gain
+        InitialCovarianceGain (1,1) double {mustBePositive} = 1e4
+
         % MinBeta0 Guard threshold for near-zero beta0 estimates
         MinBeta0 (1,1) double {mustBePositive} = 1e-3
 
@@ -72,6 +75,7 @@ classdef DirectSTRController < matlab.System
         function setupImpl(obj)
             obj.RLS_ = ddc.common.RLSEstimator('NumParameters', 2, ...
                 'ForgettingFactor', obj.ForgettingFactor, ...
+                'InitialCovarianceGain', obj.InitialCovarianceGain, ...
                 'InitialTheta', obj.InitialTheta);
             obj.PrevY_ = 0;
             obj.PrevU_ = 0;
@@ -161,7 +165,8 @@ classdef DirectSTRController < matlab.System
             groups = matlab.system.display.Section(...
                 'Title', 'DirectSTRController', ...
                 'PropertyList', {'SampleTime', 'Ac1', 'ForgettingFactor', ...
-                'MinBeta0', 'InitialS0', 'InitialT0', 'InitialTheta'});
+                'InitialCovarianceGain', 'MinBeta0', 'InitialS0', ...
+                'InitialT0', 'InitialTheta'});
         end
     end
 end
