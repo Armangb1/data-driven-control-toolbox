@@ -139,7 +139,10 @@ classdef UnfalsifiedSwitchingController < matlab.System
 
             ehat = computeFictitiousRefs(obj, uCandidates(obj.ActiveIndex_));
 
-            obj.N_ = lam*obj.N_ + obj.W2*uCandidates.^2 + obj.W1*ehat.^2;
+            % Match the legacy cost: use the control effort actually being
+            % applied (the previously active candidate) for every model.
+            uActual = uCandidates(obj.ActiveIndex_);
+            obj.N_ = lam*obj.N_ + obj.W2*uActual.^2 + obj.W1*ehat.^2;
             obj.D_ = lam*obj.D_ + (y + ehat).^2;
             V_t = obj.N_ ./ (obj.D_ + obj.Epsilon);
 
