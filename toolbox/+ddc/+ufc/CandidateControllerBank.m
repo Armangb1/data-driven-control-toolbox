@@ -38,7 +38,9 @@ classdef CandidateControllerBank < matlab.System
     properties (Access = private)
         BCoeffs_
         ACoeffs_
+        ECandPast_
         UCandPast_
+        MaxM_
         MaxN_
     end
 
@@ -55,6 +57,7 @@ classdef CandidateControllerBank < matlab.System
             n = numel(obj.Controllers);
             obj.BCoeffs_ = cell(n, 1);
             obj.ACoeffs_ = cell(n, 1);
+            obj.MaxM_ = 0;
             obj.MaxN_ = 0;
             for i = 1:n
                 C = obj.Controllers(i);
@@ -67,16 +70,17 @@ classdef CandidateControllerBank < matlab.System
                 [b, a] = tfdata(C, 'v');
                 obj.BCoeffs_{i} = b(:)';
                 obj.ACoeffs_{i} = a(:)';
+                obj.MaxM_ = max(obj.MaxM_, numel(b) - 1);
                 obj.MaxN_ = max(obj.MaxN_, numel(a) - 1);
             end
-            nCol = max(obj.MaxN_, 1) + (obj.MaxN_ > 0);
-            obj.UCandPast_ = zeros(n, nCol);
+            obj.ECandPast_ = zeros(n, max(obj.MaxM_, 1) + (obj.MaxM_ > 0));
+            obj.UCandPast_ = zeros(n, max(obj.MaxN_, 1) + (obj.MaxN_ > 0));
         end
 
         function resetImpl(obj)
             n = numel(obj.Controllers);
-            nCol = max(obj.MaxN_, 1) + (obj.MaxN_ > 0);
-            obj.UCandPast_ = zeros(n, nCol);
+            obj.ECandPast_ = zeros(n, max(obj.MaxM_, 1) + (obj.MaxM_ > 0));
+            obj.UCandPast_ = zeros(n, max(obj.MaxN_, 1) + (obj.MaxN_ > 0));
         end
 
         function uCandidates = stepImpl(obj, r, y)
@@ -86,10 +90,12 @@ classdef CandidateControllerBank < matlab.System
 
             for i = 1:n
                 uCandidates(i) = iirFilter(obj.BCoeffs_{i}, obj.ACoeffs_{i}, ...
-                    e, obj.UCandPast_(i, :));
+                    e, obj.ECandPast_(i, :), obj.UCandPast_(i, :));
             end
 
             for i = 1:n
+                obj.ECandPast_(i, :) = shiftAndInsert(obj.ECandPast_(i, :), ...
+                    e, numel(obj.BCoeffs_{i}) - 1);
                 obj.UCandPast_(i, :) = shiftAndInsert(obj.UCandPast_(i, :), ...
                     uCandidates(i), numel(obj.ACoeffs_{i}) - 1);
             end
@@ -177,16 +183,17 @@ classdef CandidateControllerBank < matlab.System
     end
 end
 
-function uCand = iirFilter(b, a, e, uPast)
-    M = numel(b) - 1;
-    N = numel(a) - 1;
-    uCand = b(1)*e;
-    if M > 0
-        uCand = uCand - b(2:end) * uPast(1:M)';
-    end
-    if N > 0
-        uCand = uCand + a(2:end) * uPast(1:N)';
-    end
+function uCand = iirFilter(b, a, e, ePast, uPast)
+M = numel(b) - 1;
+N = numel(a) - 1;
+uCand = b(1)*e;
+if M > 0
+    uCand = uCand + b(2:end) * ePast(1:M)';
+end
+if N > 0
+    uCand = uCand - a(2:end) * uPast(1:N)';
+end
+uCand = uCand / a(1);
 end
 
 function row = shiftAndInsert(row, val, n)

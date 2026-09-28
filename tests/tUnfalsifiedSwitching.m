@@ -19,7 +19,7 @@ classdef tUnfalsifiedSwitching < matlab.unittest.TestCase
 
         function testCandidateBankProportionalViaTf(testCase)
             C = [tf(0.5,1,-1), tf(1,1,-1), tf(2,1,-1)];
-            bank = ddc.ufc.CandidateControllerBank('Controllers', C);
+            bank = ddc.ufc.CandidateControllerBank('Controllers', C, 'SampleTime', 1);
             u = bank.step(1, 0.2);
             testCase.verifyEqual(u, [0.5;1;2]*0.8, 'AbsTol', 1e-12);
         end
@@ -31,13 +31,13 @@ classdef tUnfalsifiedSwitching < matlab.unittest.TestCase
             testCase.verifyEqual(u(1), 1.1, 'AbsTol', 1e-12);
             testCase.verifyEqual(u(2), 2.1, 'AbsTol', 1e-12);
             u2 = bank.step(1, 0);
-            testCase.verifyEqual(u2(1), 1.1 + 1.1*1 - 1.0*1.1, 'AbsTol', 1e-12);
+            testCase.verifyEqual(u2(1), 1.1 - 1.0 + 1.1, 'AbsTol', 1e-12);
         end
 
         function testSwitchingSelectsBestGainOverTime(testCase)
             bank = ddc.ufc.CandidateControllerBank('Controllers', [0.1; 0.5; 5]);
             sw = ddc.ufc.UnfalsifiedSwitchingController('Controllers', [0.1; 0.5; 5], ...
-                'ForgettingFactor', 0.9);
+                'SampleTime', 1, 'ForgettingFactor', 0.9);
             y = 0;
             idx = 1;
             for k = 1:100
@@ -136,9 +136,9 @@ classdef tUnfalsifiedSwitching < matlab.unittest.TestCase
 
         function testSampleTimeStaticInPlainMatlab(testCase)
             C = [tf([1.0, 0.2], [1, 0]), tf([2.0, 0.4], [1, 0])];
-            bank = ddc.ufc.CandidateControllerBank('Controllers', C);
+            bank = ddc.ufc.CandidateControllerBank('Controllers', C, 'SampleTime', 0.1);
             sw = ddc.ufc.UnfalsifiedSwitchingController('Controllers', C, ...
-                'ForgettingFactor', 0.9);
+                'SampleTime', 0.1, 'ForgettingFactor', 0.9);
             uC = bank.step(1, 0.5);
             testCase.verifyTrue(all(isfinite(uC)));
             [uSel, idx, ~] = sw.step(uC, 0.5);
