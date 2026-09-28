@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-09-28
+
 ### Added
 - `ddc.mfac.MFACController`: generalized commit-form MFAC to the Full-Form
   Dynamic Linearization (FFDL) scheme. CFDL and PFDL are now parameter presets:

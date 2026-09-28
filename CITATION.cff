@@ -24,8 +24,8 @@ keywords:
   - adaptive control
 type: software
 license: MIT
-version: "0.1.0"
-date-released: "2026-09-07"
+version: "0.2.0"
+date-released: "2026-09-28"
 authors:
   - family-names: "Gholibeikian"
     given-names: "Arman"
